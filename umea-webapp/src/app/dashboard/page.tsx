@@ -188,7 +188,7 @@ export default function DashboardPage() {
               FX Vol 60 (24/7/365)
             </div>
             <div className="mt-3 text-xs text-gray-400">
-              Mode 3: 12% Body Retrace | SL 200 pts | TP 400 pts
+              Proprietary Algorithmic Engine | Auto-Risk & Breakeven Protected
             </div>
           </div>
         </div>

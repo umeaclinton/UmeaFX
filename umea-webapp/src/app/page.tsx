@@ -85,7 +85,7 @@ export default function HomePage() {
         </h1>
 
         <p className="mt-6 text-lg sm:text-xl text-gray-400 max-w-2xl leading-relaxed">
-          Connect your Weltrade MT5 account in 60 seconds. Our high-conviction statistical engine executes precision 12% body-retracements automatically to your account with zero setup.
+          Connect your Weltrade MT5 account in 60 seconds. Our high-conviction quantitative engine automatically executes proprietary algorithmic setups directly to your account with zero manual effort.
         </p>
 
         <div className="mt-10 flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
@@ -128,7 +128,7 @@ export default function HomePage() {
             </div>
             <h3 className="text-lg font-bold text-white mb-2">24/7/365 Non-Stop</h3>
             <p className="text-sm text-gray-400">
-              Synthetics never close. The engine scans every 1-hour candle day and night, including weekends and holidays.
+              Synthetics never close. The engine operates continuously day and night, including weekends and holidays.
             </p>
           </div>
 
@@ -138,7 +138,7 @@ export default function HomePage() {
             </div>
             <h3 className="text-lg font-bold text-white mb-2">Built-in Risk Management</h3>
             <p className="text-sm text-gray-400">
-              Strict 200 pt stop loss, 400 pt take profit (1:2 R:R), plus daily circuit breakers to prevent overtrading.
+              Strict mathematical risk-to-reward controls, automated breakeven stops, plus daily circuit breakers.
             </p>
           </div>
         </div>
