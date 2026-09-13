@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUsers } from "@/lib/storage";
+import { supabaseAdmin } from "@/lib/supabase";
+import { decryptPassword } from "@/lib/encryption";
 import { SyncClientPayload } from "@/lib/types";
 
 // Master Copier Secret Key (used by local engine to authenticate)
@@ -13,39 +14,50 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
   }
 
-  const users = getUsers();
-  const now = new Date();
+  // Fetch all users with registered MT5 accounts from Supabase
+  const { data: users, error } = await supabaseAdmin
+    .from("users")
+    .select("*")
+    .not("mt5_login", "is", null);
 
-  // Filter clients who have valid MT5 credentials and active subscriptions/trials
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const now = new Date();
   const activeClients: SyncClientPayload[] = [];
 
-  for (const u of users) {
-    if (!u.mt5 || !u.mt5.login || !u.mt5.password) {
+  for (const u of (users || [])) {
+    if (!u.mt5_login || !u.mt5_password_encrypted) {
       continue;
     }
 
     let isActive = false;
 
     if (u.plan === "monthly_sub" || u.plan === "lifetime") {
-      isActive = u.planStatus === "active";
+      isActive = u.plan_status === "active";
     } else if (u.plan === "ib_free_trial") {
-      if (u.trialEndsAt) {
-        const trialEnd = new Date(u.trialEndsAt);
-        isActive = trialEnd > now && u.planStatus === "active";
+      if (u.trial_ends_at) {
+        const trialEnd = new Date(u.trial_ends_at);
+        isActive = trialEnd > now && u.plan_status === "active";
+      } else {
+        isActive = true;
       }
     }
 
     if (isActive) {
+      const decryptedPwd = decryptPassword(u.mt5_password_encrypted);
+
       activeClients.push({
         clientId: u.id,
         name: u.name,
         email: u.email,
-        login: u.mt5.login,
-        password: u.mt5.password,
-        server: u.mt5.server || "Weltrade-Real",
-        riskMode: u.mt5.riskMode || "multiplier",
-        riskValue: u.mt5.riskValue || 1.0,
-        maxLot: u.mt5.maxLot || 5.0,
+        login: Number(u.mt5_login),
+        password: decryptedPwd,
+        server: u.mt5_server || "Weltrade-Real",
+        riskMode: u.risk_mode || "multiplier",
+        riskValue: Number(u.risk_value) || 1.0,
+        maxLot: Number(u.max_lot) || 5.0,
         isActive: true,
         plan: u.plan,
       });

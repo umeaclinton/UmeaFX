@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserByEmail, upsertUser } from "@/lib/storage";
+import { supabaseAdmin } from "@/lib/supabase";
 import { PlanType } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -11,24 +11,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
     }
 
-    const existing = getUserByEmail(email);
-    let trialEndsAt = existing?.trialEndsAt;
-    if (plan === "ib_free_trial" && !trialEndsAt) {
+    const userId = `USR-${Buffer.from(email).toString("hex").substring(0, 10).toUpperCase()}`;
+    let trialEndsAt: string | null = null;
+
+    if (plan === "ib_free_trial") {
       const d = new Date();
       d.setDate(d.getDate() + 7);
       trialEndsAt = d.toISOString();
     }
 
-    const updated = upsertUser({
-      ...(existing || {}),
-      email,
-      name: name || existing?.name || "User",
-      plan,
-      planStatus: "active",
-      trialEndsAt,
-    });
+    // Upsert user plan into Supabase
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .upsert(
+        {
+          id: userId,
+          email: email.toLowerCase(),
+          name: name || email.split("@")[0],
+          plan,
+          plan_status: "active",
+          trial_ends_at: trialEndsAt,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "email" }
+      )
+      .select()
+      .single();
 
-    return NextResponse.json({ success: true, user: updated });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, user: data });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to update plan" }, { status: 500 });
   }

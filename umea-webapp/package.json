@@ -9,10 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "@types/pg": "^8.23.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
     "next": "^14.2.24",
     "next-auth": "^4.24.11",
+    "pg": "^8.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.6.0"

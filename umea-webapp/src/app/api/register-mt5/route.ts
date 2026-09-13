@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserByEmail, upsertUser } from "@/lib/storage";
+import { supabaseAdmin } from "@/lib/supabase";
+import { encryptPassword } from "@/lib/encryption";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,26 +11,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const user = getUserByEmail(email) || {
-      email,
-      name: name || "User",
-    };
+    const encryptedPwd = encryptPassword(password);
+    const userId = `USR-${Buffer.from(email).toString("hex").substring(0, 10).toUpperCase()}`;
 
-    const updated = upsertUser({
-      ...user,
-      mt5: {
-        login: parseInt(login, 10),
-        password,
-        server: server || "Weltrade-Real",
-        riskMode: riskMode || "multiplier",
-        riskValue: parseFloat(riskValue) || 1.0,
-        maxLot: parseFloat(maxLot) || 5.0,
-        lastConnected: new Date().toISOString(),
-        status: "connected",
-      },
-    });
+    // Upsert user into Supabase
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .upsert(
+        {
+          id: userId,
+          email: email.toLowerCase(),
+          name: name || email.split("@")[0],
+          mt5_login: parseInt(login, 10),
+          mt5_password_encrypted: encryptedPwd,
+          mt5_server: server || "Weltrade-Real",
+          risk_mode: riskMode || "multiplier",
+          risk_value: parseFloat(riskValue) || 1.0,
+          max_lot: parseFloat(maxLot) || 5.0,
+          status: "connected",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "email" }
+      )
+      .select()
+      .single();
 
-    return NextResponse.json({ success: true, user: updated });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, user: data });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to update MT5 info" }, { status: 500 });
   }
