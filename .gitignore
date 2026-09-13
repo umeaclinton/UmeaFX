@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.npm/
+.yarn/
+*.log
+
+# Sensitive Data / Local Configs
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+ticket_mappings.json
+users.json
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Large Binary Data (Optional Parquet raw caches)
+# data/raw/*.parquet

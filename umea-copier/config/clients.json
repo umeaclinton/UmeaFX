@@ -1,0 +1,16 @@
+{
+  "clients": [
+    {
+      "client_id": "DEMO-001",
+      "name": "Demo Client 1",
+      "login": 43259134,
+      "password": "YourPasswordHere",
+      "server": "Weltrade-Demo",
+      "risk_mode": "multiplier",
+      "risk_value": 1.0,
+      "max_lot": 2.0,
+      "is_active": false,
+      "notes": "Sample client config"
+    }
+  ]
+}
