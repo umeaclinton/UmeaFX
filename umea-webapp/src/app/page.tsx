@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   ShieldCheck,
   Zap,
-  TrendingUp,
   Clock,
   CheckCircle2,
   ArrowRight,
@@ -13,7 +13,6 @@ import {
   Activity,
   Sliders,
   Cpu,
-  Server
 } from "lucide-react";
 import { supabasePublic } from "@/lib/supabase";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -77,8 +76,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1px] shadow-lg shadow-emerald-500/20">
-              <div className="w-full h-full bg-white dark:bg-black rounded-2xl flex items-center justify-center transition-colors">
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
+              <div className="w-full h-full bg-black rounded-2xl overflow-hidden">
+                <Image src="/logo.png" alt="UmeaFX Logo" width={40} height={40} className="w-full h-full object-cover" priority />
               </div>
             </div>
             <div>
@@ -130,7 +129,7 @@ export default function HomePage() {
         </h1>
 
         <p className="mt-6 text-base sm:text-xl text-gray-500 dark:text-slate-400 max-w-3xl leading-relaxed">
-          Link your Weltrade MT5 account in under 60 seconds. Our cloud-hosted quantitative algorithm executes proprietary volatility setups directly onto your account around the clock—with zero manual intervention required.
+          Link your Weltrade MT5 account in under 60 seconds. Our cloud-hosted quantitative algorithm executes proprietary volatility setups directly onto your account around the clock. Zero manual intervention required.
         </p>
 
         {/* CTAs */}
@@ -398,7 +397,7 @@ export default function HomePage() {
                     "Full access to FX Vol 60 Autonomous System",
                     "Automated Breakeven & Stop Loss Sync",
                     "Sub-15ms cloud execution pipeline",
-                    "No VPS required — 100% hands-free",
+                    "No VPS required. 100% hands-free",
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -444,7 +443,7 @@ export default function HomePage() {
               </div>
               <button
                 onClick={() => { setSelectedPlan("monthly_sub"); setIsModalOpen(true); }}
-                className="w-full py-4 rounded-xl bg-gray-100 dark:bg-white/8 hover:bg-gray-200 dark:hover:bg-white/12 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white font-bold text-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
+                className="w-full py-4 rounded-xl bg-gray-100 dark:bg-[#1c1c1c] hover:bg-gray-200 dark:hover:bg-[#252525] border border-gray-200 dark:border-white/15 text-gray-900 dark:text-white font-bold text-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
               >
                 Subscribe Directly ($49/mo)
               </button>

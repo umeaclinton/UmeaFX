@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
-  TrendingUp,
   ShieldCheck,
   LogOut,
   Server,
@@ -118,8 +118,8 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1px] shadow-lg shadow-emerald-500/20">
-              <div className="w-full h-full bg-white dark:bg-black rounded-2xl flex items-center justify-center transition-colors">
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
+              <div className="w-full h-full bg-black rounded-2xl overflow-hidden">
+                <Image src="/logo.png" alt="UmeaFX Logo" width={40} height={40} className="w-full h-full object-cover" priority />
               </div>
             </div>
             <div>
