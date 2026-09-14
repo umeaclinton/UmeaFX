@@ -69,10 +69,9 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-white transition-colors duration-200 pt-20">
-
-      {/* ── Header ── */}
-      <header className="backdrop-blur-xl fixed top-0 left-0 right-0 z-40 bg-white/95 dark:bg-black/95 shadow-sm dark:shadow-[0_1px_12px_rgba(0,0,0,0.6)] transition-colors duration-200">
+    <>
+      {/* ── Header — outside main so sticky works correctly on all devices ── */}
+      <header className="backdrop-blur-xl sticky top-0 z-40 bg-white/95 dark:bg-black/95 shadow-sm dark:shadow-[0_1px_12px_rgba(0,0,0,0.6)] transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1px] shadow-lg shadow-emerald-500/20">
@@ -105,6 +104,8 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+
+      <main className="bg-white dark:bg-black text-gray-900 dark:text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-white transition-colors duration-200">
 
       {/* ── Hero ── */}
       <section className="relative px-4 sm:px-6 pt-16 pb-20 lg:pt-24 lg:pb-28 max-w-7xl mx-auto flex flex-col items-center text-center">
@@ -554,5 +555,6 @@ export default function HomePage() {
         <p>&copy; 2026 UmeaFX Synthetics. Institutional Automated Execution Technology. All Rights Reserved.</p>
       </footer>
     </main>
+    </>
   );
 }
