@@ -265,7 +265,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Risk Calculator ── */}
-      <section className="px-4 sm:px-6 py-20 bg-gray-50 dark:bg-[#050505] border-y border-gray-200 dark:border-white/6 transition-colors duration-200">
+      <section className="px-4 sm:px-6 py-20 bg-gray-50 dark:bg-[#050505] transition-colors duration-200">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs font-mono font-semibold text-gray-500 dark:text-slate-400 mb-3">
@@ -544,7 +544,7 @@ export default function HomePage() {
       )}
 
       {/* ── Footer ── */}
-      <footer className="border-t border-gray-200 dark:border-white/6 px-4 sm:px-6 py-8 text-center text-xs text-gray-400 dark:text-slate-500 transition-colors duration-200">
+      <footer className="px-4 sm:px-6 py-8 text-center text-xs text-gray-400 dark:text-slate-500 transition-colors duration-200">
         <p>&copy; 2026 UmeaFX Synthetics. Institutional Automated Execution Technology. All Rights Reserved.</p>
       </footer>
     </main>
