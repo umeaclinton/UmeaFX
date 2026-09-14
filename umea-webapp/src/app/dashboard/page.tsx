@@ -179,26 +179,48 @@ export default function DashboardPage() {
             </div>
 
             {plan === "ib_free_trial" && (
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch("/api/paystack/initialize", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 75000 }),
-                    });
-                    const data = await res.json();
-                    if (data.success && data.authorizationUrl) {
-                      window.location.href = data.authorizationUrl;
+              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/paystack/initialize", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 75000 }),
+                      });
+                      const data = await res.json();
+                      if (data.success && data.authorizationUrl) {
+                        window.location.href = data.authorizationUrl;
+                      }
+                    } catch (e) {
+                      console.error("Payment error:", e);
                     }
-                  } catch (e) {
-                    console.error("Payment error:", e);
-                  }
-                }}
-                className="mt-4 w-full py-2 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5"
-              >
-                <span>Upgrade to Full Sub (Paystack) &rarr;</span>
-              </button>
+                  }}
+                  className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition text-center"
+                >
+                  💳 Paystack ($49)
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/crypto/initialize", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 49.0 }),
+                      });
+                      const data = await res.json();
+                      if (data.success && data.invoiceUrl) {
+                        window.location.href = data.invoiceUrl;
+                      }
+                    } catch (e) {
+                      console.error("Crypto payment error:", e);
+                    }
+                  }}
+                  className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition text-center"
+                >
+                  ⚡ Crypto (USDT)
+                </button>
+              </div>
             )}
           </div>
 

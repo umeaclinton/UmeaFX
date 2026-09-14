@@ -21,7 +21,7 @@ export default function HomePage() {
   const [name, setName] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"ib_free_trial" | "monthly_sub">("ib_free_trial");
-
+  const [paymentGateway, setPaymentGateway] = useState<"paystack" | "crypto">("paystack");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const handleQuickLogin = async (e: React.FormEvent) => {
@@ -34,26 +34,39 @@ export default function HomePage() {
     localStorage.setItem("umea_user_name", name || email.split("@")[0]);
     localStorage.setItem("umea_selected_plan", selectedPlan);
     
-    // If Paid Monthly Plan selected, initialize Paystack Checkout
+    // If Paid Monthly Plan selected
     if (selectedPlan === "monthly_sub") {
       try {
-        const res = await fetch("/api/paystack/initialize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email,
-            name: name || email.split("@")[0],
-            plan: "monthly_sub",
-            amount: 75000,
-          }),
-        });
-        const data = await res.json();
-        if (data.success && data.authorizationUrl) {
-          window.location.href = data.authorizationUrl;
-          return;
+        if (paymentGateway === "crypto") {
+          const res = await fetch("/api/crypto/initialize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, name: name || email.split("@")[0], amount: 49.0 }),
+          });
+          const data = await res.json();
+          if (data.success && data.invoiceUrl) {
+            window.location.href = data.invoiceUrl;
+            return;
+          }
+        } else {
+          const res = await fetch("/api/paystack/initialize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email,
+              name: name || email.split("@")[0],
+              plan: "monthly_sub",
+              amount: 75000,
+            }),
+          });
+          const data = await res.json();
+          if (data.success && data.authorizationUrl) {
+            window.location.href = data.authorizationUrl;
+            return;
+          }
         }
       } catch (err) {
-        console.error("Paystack checkout error:", err);
+        console.error("Payment checkout error:", err);
       }
     }
 
@@ -364,11 +377,36 @@ export default function HomePage() {
                 />
               </div>
 
+              {selectedPlan === "monthly_sub" && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 mb-2">Select Payment Method</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentGateway("paystack")}
+                      className={`p-3 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 ${paymentGateway === "paystack" ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" : "bg-gray-900 border-gray-800 text-gray-400"}`}
+                    >
+                      <span>💳 Paystack</span>
+                      <span className="text-[10px] text-gray-500">Cards / Bank / ApplePay</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentGateway("crypto")}
+                      className={`p-3 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 ${paymentGateway === "crypto" ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" : "bg-gray-900 border-gray-800 text-gray-400"}`}
+                    >
+                      <span>⚡ Crypto (USDT)</span>
+                      <span className="text-[10px] text-gray-500">TRC20 / BEP20 / BTC</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-all mt-2 shadow-lg shadow-emerald-500/20"
+                disabled={isProcessingPayment}
+                className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-all mt-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
               >
-                Continue to Dashboard &rarr;
+                {isProcessingPayment ? "Redirecting to Checkout..." : selectedPlan === "monthly_sub" ? `Proceed to Pay ($49 via ${paymentGateway === "crypto" ? "Crypto" : "Paystack"}) →` : "Continue to Dashboard →"}
               </button>
             </form>
           </div>
