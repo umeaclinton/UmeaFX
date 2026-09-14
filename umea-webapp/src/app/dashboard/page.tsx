@@ -14,6 +14,7 @@ import {
   Layers,
   Settings2,
 } from "lucide-react";
+import { supabasePublic } from "@/lib/supabase";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -34,24 +35,34 @@ export default function DashboardPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const storedEmail = localStorage.getItem("umea_user_email");
-    const storedName = localStorage.getItem("umea_user_name");
-    const storedPlan = (localStorage.getItem("umea_selected_plan") as any) || "ib_free_trial";
+    async function initUser() {
+      // 1. Check Supabase Auth
+      const { data: { user } } = await supabasePublic.auth.getUser();
+      let activeEmail = user?.email;
+      let activeName = user?.user_metadata?.full_name || user?.user_metadata?.name;
 
-    if (!storedEmail) {
-      router.push("/");
-      return;
-    }
+      // 2. Fallback to localStorage
+      if (!activeEmail) {
+        activeEmail = localStorage.getItem("umea_user_email") || "";
+        activeName = localStorage.getItem("umea_user_name") || "";
+      }
 
-    setEmail(storedEmail);
-    setName(storedName || "Trader");
-    setPlan(storedPlan);
+      if (!activeEmail) {
+        router.push("/");
+        return;
+      }
 
-    // Fetch existing user state from backend
-    fetch(`/api/clients?key=umea-fx60-secret-bridge-key`)
-      .then((res) => res.json())
-      .then((data) => {
-        const found = data.clients?.find((c: any) => c.email.toLowerCase() === storedEmail.toLowerCase());
+      setEmail(activeEmail);
+      setName(activeName || activeEmail.split("@")[0] || "Trader");
+
+      const storedPlan = (localStorage.getItem("umea_selected_plan") as any) || "ib_free_trial";
+      setPlan(storedPlan);
+
+      // Fetch user data from backend
+      try {
+        const res = await fetch(`/api/clients?key=umea-fx60-secret-bridge-key`);
+        const data = await res.json();
+        const found = data.clients?.find((c: any) => c.email.toLowerCase() === activeEmail.toLowerCase());
         if (found) {
           setLogin(found.login.toString());
           setServer(found.server);
@@ -60,9 +71,17 @@ export default function DashboardPage() {
           setMaxLot(found.maxLot.toString());
           setIsSaved(true);
         }
-      })
-      .catch(() => {});
+      } catch {}
+    }
+
+    initUser();
   }, [router]);
+
+  const handleLogout = async () => {
+    await supabasePublic.auth.signOut();
+    localStorage.clear();
+    router.push("/");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,11 +116,6 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.clear();
-    router.push("/");
   };
 
   return (

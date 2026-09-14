@@ -13,6 +13,7 @@ import {
   Sparkles,
   Award
 } from "lucide-react";
+import { supabasePublic } from "@/lib/supabase";
 
 export default function HomePage() {
   const router = useRouter();
@@ -269,24 +270,20 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* Google 1-Click Button Simulation */}
+            {/* Google 1-Click Button */}
             <button
-              onClick={() => {
-                const sampleEmail = "trader@" + Math.random().toString(36).substring(7) + ".com";
-                setEmail(sampleEmail);
-                setName("Google Trader");
-                localStorage.setItem("umea_user_email", sampleEmail);
-                localStorage.setItem("umea_user_name", "Google Trader");
-                localStorage.setItem("umea_selected_plan", selectedPlan);
-                fetch("/api/select-plan", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email: sampleEmail, name: "Google Trader", plan: selectedPlan }),
-                }).finally(() => {
-                  router.push("/dashboard");
+              onClick={async () => {
+                const { error } = await supabasePublic.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                  },
                 });
+                if (error) {
+                  console.error("Google Auth error:", error.message);
+                }
               }}
-              className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-gray-100 text-gray-900 font-bold text-sm transition-all flex items-center justify-center gap-3 mb-4 shadow-md"
+              className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-gray-100 text-gray-900 font-bold text-sm transition-all flex items-center justify-center gap-3 mb-4 shadow-md hover:scale-[1.01]"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
