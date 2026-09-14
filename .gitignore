@@ -40,6 +40,7 @@ out/
 .env.production.local
 ticket_mappings.json
 users.json
+master.json
 
 # OS / IDE
 .DS_Store

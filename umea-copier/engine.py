@@ -46,6 +46,10 @@ class CopierEngine:
         # Mapping: str(master_ticket) -> {client_id: client_ticket}
         self.mappings: Dict[str, Dict[str, int]] = {}
         self.is_running = False
+        # Master credentials — stored on first sync so we can always restore
+        self.master_login: Optional[int] = None
+        self.master_password: Optional[str] = None
+        self.master_server: Optional[str] = None
         self._load_mappings()
 
     def _load_mappings(self):
@@ -61,6 +65,24 @@ class CopierEngine:
         MAPPINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(MAPPINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(self.mappings, f, indent=2)
+
+    def _restore_master(self) -> bool:
+        """Re-login to master account after a client operation.
+        This is CRITICAL — a single MT5 terminal instance can only be logged
+        into ONE account at a time. Every client login call switches the active
+        account, so we must immediately switch back to master before doing anything
+        else (especially reading master positions).
+        """
+        if not self.master_login or not self.master_password or not self.master_server:
+            return False  # Credentials not captured yet (first cycle edge case)
+        ok = mt5.login(
+            login=self.master_login,
+            password=self.master_password,
+            server=self.master_server,
+        )
+        if not ok:
+            logger.error(f"[CRITICAL] Failed to restore Master session ({self.master_login}): {mt5.last_error()}")
+        return ok
 
     def reload_clients(self):
         from config import fetch_cloud_clients
@@ -135,106 +157,167 @@ class CopierEngine:
         return round(vol, 2)
 
     def execute_client_open(self, client: ClientAccount, master_pos: PositionSnapshot) -> Optional[int]:
-        """Login to client account and copy open trade."""
+        """Login to client account, copy open trade, then IMMEDIATELY restore master session."""
         if not mt5.login(login=client.login, password=client.password, server=client.server):
             logger.error(f"Failed to login to Client {client.name} ({client.login}): {mt5.last_error()}")
+            self._restore_master()
             return None
 
-        sym_info = mt5.symbol_info(self.symbol)
-        if not sym_info:
-            logger.error(f"Symbol {self.symbol} not found on Client {client.login}")
-            return None
+        try:
+            sym_info = mt5.symbol_info(self.symbol)
+            if not sym_info:
+                logger.error(f"Symbol {self.symbol} not found on Client {client.login}")
+                return None
 
-        volume = self.calculate_client_volume(client, master_pos.volume, master_pos.sl, master_pos.price_open)
-        digits = sym_info.digits
+            volume = self.calculate_client_volume(client, master_pos.volume, master_pos.sl, master_pos.price_open)
+            digits = sym_info.digits
 
-        if master_pos.order_type == mt5.ORDER_TYPE_BUY:
-            price = mt5.symbol_info_tick(self.symbol).ask
-            action = mt5.TRADE_ACTION_DEAL
-            order_type = mt5.ORDER_TYPE_BUY
-        else:
-            price = mt5.symbol_info_tick(self.symbol).bid
-            action = mt5.TRADE_ACTION_DEAL
-            order_type = mt5.ORDER_TYPE_SELL
+            if master_pos.order_type == mt5.ORDER_TYPE_BUY:
+                price = mt5.symbol_info_tick(self.symbol).ask
+                action = mt5.TRADE_ACTION_DEAL
+                order_type = mt5.ORDER_TYPE_BUY
+            else:
+                price = mt5.symbol_info_tick(self.symbol).bid
+                action = mt5.TRADE_ACTION_DEAL
+                order_type = mt5.ORDER_TYPE_SELL
 
-        sl = round(master_pos.sl, digits) if master_pos.sl > 0 else 0.0
-        tp = round(master_pos.tp, digits) if master_pos.tp > 0 else 0.0
+            sl = round(master_pos.sl, digits) if master_pos.sl > 0 else 0.0
+            tp = round(master_pos.tp, digits) if master_pos.tp > 0 else 0.0
 
-        request = {
-            "action": action,
-            "symbol": self.symbol,
-            "volume": volume,
-            "type": order_type,
-            "price": price,
-            "sl": sl,
-            "tp": tp,
-            "deviation": 30,
-            "magic": 606060,
-            "comment": f"UMEA-Copy-{master_pos.ticket}",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
-        }
+            # Determine the appropriate filling type for this symbol/broker
+            filling_mode = sym_info.filling_mode
+            if filling_mode & 1:  # SYMBOL_FILLING_FOK
+                filling_type = mt5.ORDER_FILLING_FOK
+            elif filling_mode & 2:  # SYMBOL_FILLING_IOC
+                filling_type = mt5.ORDER_FILLING_IOC
+            else:
+                filling_type = mt5.ORDER_FILLING_RETURN
 
-        res = mt5.order_send(request)
-        if res.retcode != mt5.TRADE_RETCODE_DONE:
-            logger.error(f"Client {client.login} Open Order Failed: code={res.retcode}, comment={res.comment}")
-            return None
+            request = {
+                "action": action,
+                "symbol": self.symbol,
+                "volume": volume,
+                "type": order_type,
+                "price": price,
+                "sl": sl,
+                "tp": tp,
+                "deviation": 30,
+                "magic": 606060,
+                "comment": f"UMEA-Copy-{master_pos.ticket}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": filling_type,
+            }
 
-        logger.info(f"✅ Copied trade to {client.name} ({client.login}) | Ticket: {res.order} | Vol: {volume} | Price: {price}")
-        return res.order
+            res = mt5.order_send(request)
+            if res.retcode != mt5.TRADE_RETCODE_DONE:
+                # Try fallback filling mode if filling error
+                if res.retcode == 10030:  # Unsupported filling mode
+                    for fallback in [mt5.ORDER_FILLING_RETURN, mt5.ORDER_FILLING_FOK, mt5.ORDER_FILLING_IOC]:
+                        if fallback != filling_type:
+                            request["type_filling"] = fallback
+                            res = mt5.order_send(request)
+                            if res.retcode == mt5.TRADE_RETCODE_DONE:
+                                break
+                if res.retcode != mt5.TRADE_RETCODE_DONE:
+                    logger.error(f"Client {client.login} Open Order Failed: code={res.retcode}, comment={res.comment}")
+                    return None
+
+            logger.info(f"✅ Copied trade to {client.name} ({client.login}) | Ticket: {res.order} | Vol: {volume} | Price: {price}")
+            return res.order
+
+        finally:
+            # ALWAYS restore master account, no matter what happens above
+            self._restore_master()
 
     def execute_client_modify(self, client: ClientAccount, client_ticket: int, new_sl: float, new_tp: float) -> bool:
-        """Login to client account and sync SL/TP (e.g. Breakeven)."""
+        """Login to client account, sync SL/TP, then IMMEDIATELY restore master session."""
         if not mt5.login(login=client.login, password=client.password, server=client.server):
+            self._restore_master()
             return False
 
-        digits = mt5.symbol_info(self.symbol).digits if mt5.symbol_info(self.symbol) else 2
-        sl = round(new_sl, digits)
-        tp = round(new_tp, digits)
+        try:
+            digits = mt5.symbol_info(self.symbol).digits if mt5.symbol_info(self.symbol) else 2
+            sl = round(new_sl, digits)
+            tp = round(new_tp, digits)
 
-        request = {
-            "action": mt5.TRADE_ACTION_SLTP,
-            "position": client_ticket,
-            "symbol": self.symbol,
-            "sl": sl,
-            "tp": tp,
-        }
-        res = mt5.order_send(request)
-        return res.retcode == mt5.TRADE_RETCODE_DONE
+            request = {
+                "action": mt5.TRADE_ACTION_SLTP,
+                "position": client_ticket,
+                "symbol": self.symbol,
+                "sl": sl,
+                "tp": tp,
+            }
+            res = mt5.order_send(request)
+            return res.retcode == mt5.TRADE_RETCODE_DONE
+
+        finally:
+            self._restore_master()
 
     def execute_client_close(self, client: ClientAccount, client_ticket: int) -> bool:
-        """Login to client account and close position."""
+        """Login to client account, close position, then IMMEDIATELY restore master session."""
         if not mt5.login(login=client.login, password=client.password, server=client.server):
+            self._restore_master()
             return False
 
-        pos = mt5.positions_get(ticket=client_ticket)
-        if not pos or len(pos) == 0:
-            # Position already closed (hit TP or SL)
-            return True
+        try:
+            pos = mt5.positions_get(ticket=client_ticket)
+            if not pos or len(pos) == 0:
+                # Position already closed (hit TP or SL)
+                return True
 
-        p = pos[0]
-        tick = mt5.symbol_info_tick(self.symbol)
-        price = tick.bid if p.type == mt5.ORDER_TYPE_BUY else tick.ask
-        close_type = mt5.ORDER_TYPE_SELL if p.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+            p = pos[0]
+            tick = mt5.symbol_info_tick(self.symbol)
+            price = tick.bid if p.type == mt5.ORDER_TYPE_BUY else tick.ask
+            close_type = mt5.ORDER_TYPE_SELL if p.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
 
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "position": client_ticket,
-            "symbol": self.symbol,
-            "volume": p.volume,
-            "type": close_type,
-            "price": price,
-            "deviation": 30,
-            "magic": 606060,
-            "comment": f"UMEA-Close-{client_ticket}",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_IOC,
-        }
-        res = mt5.order_send(request)
-        return res.retcode == mt5.TRADE_RETCODE_DONE
+            sym_info = mt5.symbol_info(self.symbol)
+            filling_mode = sym_info.filling_mode if sym_info else 0
+            if filling_mode & 1:
+                filling_type = mt5.ORDER_FILLING_FOK
+            elif filling_mode & 2:
+                filling_type = mt5.ORDER_FILLING_IOC
+            else:
+                filling_type = mt5.ORDER_FILLING_RETURN
+
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "position": client_ticket,
+                "symbol": self.symbol,
+                "volume": p.volume,
+                "type": close_type,
+                "price": price,
+                "deviation": 30,
+                "magic": 606060,
+                "comment": f"UMEA-Close-{client_ticket}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": filling_type,
+            }
+            res = mt5.order_send(request)
+            if res.retcode != mt5.TRADE_RETCODE_DONE and res.retcode == 10030:
+                for fallback in [mt5.ORDER_FILLING_RETURN, mt5.ORDER_FILLING_FOK, mt5.ORDER_FILLING_IOC]:
+                    if fallback != filling_type:
+                        request["type_filling"] = fallback
+                        res = mt5.order_send(request)
+                        if res.retcode == mt5.TRADE_RETCODE_DONE:
+                            break
+            return res.retcode == mt5.TRADE_RETCODE_DONE
+        finally:
+            self._restore_master()
 
     def sync_cycle(self, master_login: int, master_pwd: Optional[str], master_server: str):
         """Single high-speed check and synchronization cycle."""
+        # Save master credentials for automatic session restoration
+        self.master_login = master_login
+        if master_pwd:
+            self.master_password = master_pwd
+        self.master_server = master_server
+
+        # Ensure we are logged in as master before reading positions
+        acc = mt5.account_info()
+        if not acc or acc.login != master_login:
+            if self.master_password:
+                mt5.login(login=master_login, password=self.master_password, server=master_server)
+
         # 1. Read Master Positions
         master_positions = self.get_master_positions()
         current_master_tickets = {str(p.ticket): p for p in master_positions}
@@ -245,6 +328,9 @@ class CopierEngine:
                 self.mappings[m_ticket_str] = {}
 
             for client in self.clients:
+                if client.login == master_login:
+                    continue  # Skip master account itself
+
                 if client.client_id not in self.mappings[m_ticket_str]:
                     logger.info(f"🔔 New master position detected: #{m_ticket_str} ({'BUY' if m_pos.order_type==0 else 'SELL'}). Copying to {client.name}...")
                     c_ticket = self.execute_client_open(client, m_pos)
@@ -274,5 +360,5 @@ class CopierEngine:
             self._save_mappings()
 
         # Re-login back to master if needed
-        if master_pwd:
-            mt5.login(login=master_login, password=master_pwd, server=master_server)
+        self._restore_master()
+

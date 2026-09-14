@@ -14,11 +14,12 @@ from rich.panel import Panel
 from rich.prompt import Confirm, FloatPrompt, IntPrompt, Prompt
 from rich.table import Table
 
-# Add local path
-sys.path.insert(0, str(Path(__file__).parent))
-
+import logging
 from config import ClientAccount, load_clients, save_clients
 from engine import CopierEngine
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("UmeaCopier")
 
 console = Console()
 
@@ -104,6 +105,8 @@ def toggle_client_status():
 
 
 def run_copier_service():
+    from config import load_master_config, save_master_config
+
     engine = CopierEngine(symbol="FX Vol 60")
     if not engine.init_terminal():
         rprint("[bold red]Could not connect to MT5 terminal. Make sure MT5 is running![/bold red]")
@@ -115,17 +118,39 @@ def run_copier_service():
         rprint("[bold red]Could not read Master Account Info.[/bold red]")
         return
 
+    master_cfg = load_master_config()
+    # If saved login matches or not configured, use current terminal account
+    if master_cfg.login == 0 or master_cfg.login != acc["login"]:
+        master_cfg.login = acc["login"]
+        master_cfg.server = acc["server"]
+
+    # Check if we have password for master account to enable seamless restoration
+    if not master_cfg.password:
+        rprint(Panel(
+            f"[bold yellow]Master Account Session Lock Protection[/bold yellow]\n\n"
+            f"Detected Master Account: [bold cyan]{acc['login']}[/bold cyan] on [bold magenta]{acc['server']}[/bold magenta]\n"
+            f"To prevent MT5 from staying logged into a client account after copying a trade,\n"
+            f"enter the master account password (saved locally in [dim]config/master.json[/dim]):",
+            title="[bold yellow]MASTER ACCOUNT SETUP[/bold yellow]"
+        ))
+        pwd = Prompt.ask("Enter Master MT5 Trade Password", password=True)
+        if pwd:
+            master_cfg.password = pwd
+            save_master_config(master_cfg)
+            rprint("[bold green]✅ Master credentials saved for auto-session restore.[/bold green]")
+
     rprint(Panel(f"[bold cyan]UmeaFX High-Speed Trade Copier Running[/bold cyan]\n"
                  f"Master Login: [bold yellow]{acc['login']}[/bold yellow] | Server: [bold magenta]{acc['server']}[/bold magenta]\n"
                  f"Balance: [bold green]${acc['balance']:.2f}[/bold green] | Active Clients: [bold cyan]{len(engine.clients)}[/bold cyan]\n"
-                 f"Monitoring Symbol: [bold yellow]FX Vol 60[/bold yellow] | Interval: [dim]100ms[/dim]",
+                 f"Monitoring Symbol: [bold yellow]FX Vol 60[/bold yellow] | Interval: [dim]100ms[/dim]\n"
+                 f"Master Auto-Restore: [bold green]{'ENABLED' if master_cfg.password else 'DISABLED (Password needed)'}[/bold green]",
                  title="[bold green]SERVICE ONLINE[/bold green]"))
 
     rprint("[dim]Press Ctrl+C to stop copier service anytime.[/dim]\n")
 
     try:
         while True:
-            engine.sync_cycle(master_login=acc["login"], master_pwd=None, master_server=acc["server"])
+            engine.sync_cycle(master_login=acc["login"], master_pwd=master_cfg.password, master_server=acc["server"])
             time.sleep(0.1)
     except KeyboardInterrupt:
         rprint("\n[bold yellow]Copier service stopped by user.[/bold yellow]")

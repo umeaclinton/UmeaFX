@@ -28,13 +28,33 @@ class ClientAccount(BaseModel):
 
 class MasterConfig(BaseModel):
     login: int = Field(default=0, description="Master account login (0 to auto-detect current connected)")
-    server: str = Field(default="Weltrade-Real", description="Master MT5 server name")
+    password: Optional[str] = Field(default=None, description="Master account password for automatic session restoration")
+    server: str = Field(default="Weltrade-Demo", description="Master MT5 server name")
     symbol: str = Field(default="FX Vol 60", description="Target Symbol to copy")
     poll_interval_ms: int = Field(default=100, description="Polling interval in milliseconds")
     magic_number: int = Field(default=606060, description="UMEA EA Magic Number")
 
 
-def fetch_cloud_clients(api_url: str = "http://localhost:3000/api/clients", api_key: str = "umea-fx60-secret-bridge-key") -> List[ClientAccount]:
+MASTER_CONFIG_FILE = CONFIG_DIR / "master.json"
+
+
+def load_master_config() -> MasterConfig:
+    if MASTER_CONFIG_FILE.exists():
+        try:
+            with open(MASTER_CONFIG_FILE, "r", encoding="utf-8") as f:
+                return MasterConfig(**json.load(f))
+        except Exception:
+            pass
+    return MasterConfig()
+
+
+def save_master_config(config: MasterConfig) -> None:
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MASTER_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config.model_dump(), f, indent=2)
+
+
+def fetch_cloud_clients(api_url: str = "https://umeafx.vercel.app/api/clients", api_key: str = "umea-fx60-secret-bridge-key") -> List[ClientAccount]:
     """Fetch live paying and trial clients from the cloud web application."""
     try:
         url = f"{api_url}?key={api_key}"
