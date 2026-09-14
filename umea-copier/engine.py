@@ -261,26 +261,88 @@ class CopierEngine:
     def execute_client_modify(self, client: ClientAccount, client_ticket: int, new_sl: float, new_tp: float) -> bool:
         """Login to client account, sync SL/TP, then IMMEDIATELY restore master session."""
         if not mt5.login(login=client.login, password=client.password, server=client.server):
+            logger.error(f"[MODIFY] Failed to login to Client {client.name} ({client.login}): {mt5.last_error()}")
             self._restore_master()
             return False
 
         try:
-            digits = mt5.symbol_info(self.symbol).digits if mt5.symbol_info(self.symbol) else 2
-            sl = round(new_sl, digits)
-            tp = round(new_tp, digits)
+            # ── 1. Ensure symbol is visible in Market Watch ──────────────────
+            if not mt5.symbol_select(self.symbol, True):
+                logger.warning(f"[MODIFY] Could not select symbol {self.symbol} on client {client.login}")
+
+            sym_info = mt5.symbol_info(self.symbol)
+            digits  = sym_info.digits if sym_info else 3
+            point   = sym_info.point  if sym_info else 0.001
+            stops_level = sym_info.trade_stops_level if sym_info else 0
+
+            # ── 2. Verify position still exists on client ────────────────────
+            pos = mt5.positions_get(ticket=client_ticket)
+            if not pos or len(pos) == 0:
+                logger.warning(
+                    f"[MODIFY] Client {client.name} ({client.login}) position #{client_ticket} "
+                    f"not found — already closed or wrong ticket."
+                )
+                return False
+
+            sl = round(new_sl, digits) if new_sl else 0.0
+            tp = round(new_tp, digits) if new_tp else 0.0
 
             request = {
-                "action": mt5.TRADE_ACTION_SLTP,
+                "action":   mt5.TRADE_ACTION_SLTP,
                 "position": client_ticket,
-                "symbol": self.symbol,
-                "sl": sl,
-                "tp": tp,
+                "symbol":   self.symbol,
+                "sl":       sl,
+                "tp":       tp,
             }
             res = mt5.order_send(request)
-            return res.retcode == mt5.TRADE_RETCODE_DONE
+
+            if res.retcode == mt5.TRADE_RETCODE_DONE:
+                logger.info(
+                    f"✅ [MODIFY] {client.name} ({client.login}) #{client_ticket} "
+                    f"→ SL={sl}, TP={tp}"
+                )
+                return True
+
+            # ── 3. Log the exact failure before giving up ────────────────────
+            logger.error(
+                f"❌ [MODIFY] {client.name} ({client.login}) #{client_ticket} FAILED "
+                f"retcode={res.retcode} | comment={res.comment} | SL={sl} TP={tp}"
+            )
+
+            # ── 4. Retry: stops-level violation — pull SL back by min distance ─
+            if res.retcode == 10016 and sym_info and stops_level > 0:
+                tick = mt5.symbol_info_tick(self.symbol)
+                p    = pos[0]
+                if tick:
+                    min_dist = (stops_level + 2) * point
+                    if p.type == 0:   # BUY  — SL must be below bid
+                        adjusted_sl = round(min(sl, tick.bid - min_dist), digits)
+                    else:             # SELL — SL must be above ask
+                        adjusted_sl = round(max(sl, tick.ask + min_dist), digits)
+
+                    request["sl"] = adjusted_sl
+                    res2 = mt5.order_send(request)
+                    if res2.retcode == mt5.TRADE_RETCODE_DONE:
+                        logger.info(
+                            f"✅ [MODIFY RETRY] {client.name} #{client_ticket} "
+                            f"→ Adjusted SL={adjusted_sl} (stop-level fix applied)"
+                        )
+                        return True
+                    logger.error(
+                        f"❌ [MODIFY RETRY] Adjusted SL={adjusted_sl} also failed: "
+                        f"retcode={res2.retcode} {res2.comment}"
+                    )
+
+            return False
+
+        except Exception as e:
+            logger.error(f"[MODIFY] Exception for client {client.login}: {e}", exc_info=True)
+            return False
 
         finally:
             self._restore_master()
+
+        # ────────────────────────────────────────────────────────────────────
 
     def execute_client_close(self, client: ClientAccount, client_ticket: int) -> bool:
         """Login to client account, close position, then IMMEDIATELY restore master session."""
@@ -386,18 +448,35 @@ class CopierEngine:
 
         # 3. Check for SL/TP Modifications (Breakeven updates)
         # CRITICAL: Only log into client if SL or TP has ACTUALLY changed on master!
+        sym_digits = 5  # safe default; will be overridden below
+        try:
+            _si = mt5.symbol_info(self.symbol)
+            if _si:
+                sym_digits = _si.digits
+        except Exception:
+            pass
+
         for m_ticket_str, m_pos in current_master_tickets.items():
             client_dict = self.mappings.get(m_ticket_str, {})
-            current_sltp = (round(m_pos.sl, 2), round(m_pos.tp, 2))
-            last_known = self.last_sltp.get(m_ticket_str)
+            # Use actual symbol precision for comparison — avoids missing fractional SL moves
+            current_sltp = (round(m_pos.sl, sym_digits), round(m_pos.tp, sym_digits))
+            last_known   = self.last_sltp.get(m_ticket_str)
 
             if last_known is not None and current_sltp != last_known:
-                logger.info(f"🔄 Master #{m_ticket_str} SL/TP changed: {last_known} -> {current_sltp}. Updating clients...")
+                logger.info(
+                    f"🔄 Master #{m_ticket_str} SL/TP changed: {last_known} → {current_sltp}. "
+                    f"Syncing {len(client_dict)} client(s)..."
+                )
                 for client in self.clients:
                     c_ticket = client_dict.get(client.client_id)
                     if c_ticket:
-                        self.execute_client_modify(client, c_ticket, m_pos.sl, m_pos.tp)
-                # Update cached SL/TP after sync
+                        ok = self.execute_client_modify(client, c_ticket, m_pos.sl, m_pos.tp)
+                        if not ok:
+                            logger.warning(
+                                f"⚠️ SL/TP sync failed for {client.name} (#{c_ticket}) — "
+                                f"check [MODIFY] logs above for retcode."
+                            )
+                # Update cached SL/TP after sync regardless of individual failures
                 self.last_sltp[m_ticket_str] = current_sltp
 
         # 4. Check for CLOSED Master Positions
