@@ -19,13 +19,7 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  overflow-x: hidden;
-  max-width: 100vw;
   transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-html {
-  overflow-x: hidden;
 }
 
 body {

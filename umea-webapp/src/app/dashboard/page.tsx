@@ -112,8 +112,8 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* ── Navbar — outside main div so sticky works on all devices ── */}
-      <header className="bg-white/95 dark:bg-black/95 sticky top-0 z-40 backdrop-blur-xl shadow-sm dark:shadow-[0_1px_12px_rgba(0,0,0,0.6)] transition-colors duration-200">
+      {/* ── Navbar — fixed so it never scrolls ── */}
+      <header className="bg-white/95 dark:bg-black/95 fixed top-0 left-0 right-0 z-40 backdrop-blur-xl shadow-sm dark:shadow-[0_1px_12px_rgba(0,0,0,0.6)] transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1px] shadow-lg shadow-emerald-500/20">
@@ -153,6 +153,8 @@ export default function DashboardPage() {
       </header>
 
       <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white transition-colors duration-200">
+      {/* Spacer for fixed header height */}
+      <div className="h-20 shrink-0" />
 
       {/* ── Main ── */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 w-full flex-1">
