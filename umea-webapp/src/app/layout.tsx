@@ -2,8 +2,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "UmeaFX | Cloud Algorithmic Copy Trading for Synthetics",
-  description: "Automated 24/7 FX Vol 60 Algorithmic Trade Copier Engine by UmeaFX",
+  title: "UmeaFX | Autonomous Quantitative Trading for Synthetics",
+  description: "24/7/365 Autonomous FX Vol 60 Quantitative Algorithmic Execution System by UmeaFX",
 };
 
 export default function RootLayout({
