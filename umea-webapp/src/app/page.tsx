@@ -22,21 +22,48 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"ib_free_trial" | "monthly_sub">("ib_free_trial");
 
-  const handleQuickLogin = (e: React.FormEvent) => {
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  const handleQuickLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
+    setIsProcessingPayment(true);
     
-    // Store session locally for demo/app state
+    // Store session locally
     localStorage.setItem("umea_user_email", email);
     localStorage.setItem("umea_user_name", name || email.split("@")[0]);
     localStorage.setItem("umea_selected_plan", selectedPlan);
     
-    // Register initial user state
+    // If Paid Monthly Plan selected, initialize Paystack Checkout
+    if (selectedPlan === "monthly_sub") {
+      try {
+        const res = await fetch("/api/paystack/initialize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            name: name || email.split("@")[0],
+            plan: "monthly_sub",
+            amount: 75000,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && data.authorizationUrl) {
+          window.location.href = data.authorizationUrl;
+          return;
+        }
+      } catch (err) {
+        console.error("Paystack checkout error:", err);
+      }
+    }
+
+    // Default: Register plan and proceed to dashboard
     fetch("/api/select-plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, name: name || email.split("@")[0], plan: selectedPlan }),
     }).finally(() => {
+      setIsProcessingPayment(false);
       router.push("/dashboard");
     });
   };

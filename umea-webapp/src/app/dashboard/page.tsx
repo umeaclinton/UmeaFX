@@ -156,25 +156,50 @@ export default function DashboardPage() {
         {/* Status Banners */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Subscription Status Card */}
-          <div className="p-6 rounded-2xl bg-[#0E1420] border border-gray-800">
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Active Access Tier
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="text-xl font-extrabold text-white">
-                {plan === "ib_free_trial" ? "7-Day IB Free Trial" : "Monthly Sub ($49)"}
+          <div className="p-6 rounded-2xl bg-[#0E1420] border border-gray-800 flex flex-col justify-between">
+            <div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+                Active Access Tier
               </div>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
-                ACTIVE
-              </span>
+              <div className="flex items-center justify-between">
+                <div className="text-xl font-extrabold text-white">
+                  {plan === "ib_free_trial" ? "7-Day IB Free Trial" : "Monthly Sub ($49)"}
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
+                  ACTIVE
+                </span>
+              </div>
+              <div className="mt-3 text-xs text-gray-400">
+                {plan === "ib_free_trial" ? (
+                  <span>7-Day Partner Pass. Automatically syncs with master.</span>
+                ) : (
+                  <span>Active Monthly Plan ($49/mo).</span>
+                )}
+              </div>
             </div>
-            <div className="mt-3 text-xs text-gray-400">
-              {plan === "ib_free_trial" ? (
-                <span>Expires in <strong className="text-emerald-400">7 days</strong>. Automatically syncs with master.</span>
-              ) : (
-                <span>Next billing cycle: Active monthly auto-renew.</span>
-              )}
-            </div>
+
+            {plan === "ib_free_trial" && (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/paystack/initialize", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 75000 }),
+                    });
+                    const data = await res.json();
+                    if (data.success && data.authorizationUrl) {
+                      window.location.href = data.authorizationUrl;
+                    }
+                  } catch (e) {
+                    console.error("Payment error:", e);
+                  }
+                }}
+                className="mt-4 w-full py-2 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-1.5"
+              >
+                <span>Upgrade to Full Sub (Paystack) &rarr;</span>
+              </button>
+            )}
           </div>
 
           {/* Copier Status Card */}
