@@ -323,7 +323,7 @@ export default function HomePage() {
                   console.error("Google Auth error:", error.message);
                 }
               }}
-              className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-gray-100 text-gray-900 font-bold text-sm transition-all flex items-center justify-center gap-3 mb-4 shadow-md hover:scale-[1.01]"
+              className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-gray-100 text-gray-900 font-bold text-sm transition-all flex items-center justify-center gap-3 mb-3 shadow-md hover:scale-[1.01]"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -344,6 +344,27 @@ export default function HomePage() {
                 />
               </svg>
               <span>Continue with Google</span>
+            </button>
+
+            {/* Apple 1-Click Button */}
+            <button
+              onClick={async () => {
+                const { error } = await supabasePublic.auth.signInWithOAuth({
+                  provider: "apple",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                  },
+                });
+                if (error) {
+                  console.error("Apple Auth error:", error.message);
+                }
+              }}
+              className="w-full py-3.5 px-4 rounded-xl bg-black hover:bg-gray-950 text-white border border-gray-700 font-bold text-sm transition-all flex items-center justify-center gap-3 mb-4 shadow-md hover:scale-[1.01]"
+            >
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 170 170">
+                <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.04-7.58-7.7-11.64-13.98-5.54-8.59-9.87-18.42-13-29.5-3.13-11.08-4.7-21.73-4.7-31.96 0-14.24 3.7-25.96 11.1-35.15 7.4-9.19 16.5-13.88 27.31-14.07 4.58 0 9.87 1.25 15.86 3.75 6 2.5 9.87 3.8 11.61 3.91 1.52-.22 5.66-1.63 12.43-4.24 6.77-2.61 12.28-3.75 16.52-3.42 12.82.76 22.82 5.49 30 14.2-11.3 6.85-16.85 16.14-16.63 27.87.22 9.13 3.69 16.85 10.43 23.15 6.74 6.3 14.67 9.89 23.8 10.76-2.17 6.41-4.78 12.83-7.83 19.24zM119.22 32.74c0-7.18 2.61-13.91 7.83-20.22 5.22-6.3 11.63-10.33 19.24-12.07.22 1.3.33 2.5.33 3.59 0 7.07-2.72 13.8-8.15 20.22-5.43 6.41-11.85 10.33-19.25 11.74-.22-1.09-.33-2.17-.33-3.26z"/>
+              </svg>
+              <span>Continue with Apple</span>
             </button>
 
             <div className="relative flex items-center justify-center my-5">
