@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "UmeaFX | Autonomous Quantitative Trading for Synthetics",
@@ -12,9 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-[#090D14] text-gray-100 min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
