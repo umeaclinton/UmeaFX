@@ -213,21 +213,46 @@ class CopierEngine:
             }
 
             res = mt5.order_send(request)
-            if res.retcode != mt5.TRADE_RETCODE_DONE:
-                # Try fallback filling mode if filling error
-                if res.retcode == 10030:  # Unsupported filling mode
-                    for fallback in [mt5.ORDER_FILLING_RETURN, mt5.ORDER_FILLING_FOK, mt5.ORDER_FILLING_IOC]:
-                        if fallback != filling_type:
-                            request["type_filling"] = fallback
-                            res = mt5.order_send(request)
-                            if res.retcode == mt5.TRADE_RETCODE_DONE:
-                                break
-                if res.retcode != mt5.TRADE_RETCODE_DONE:
-                    logger.error(f"Client {client.login} Open Order Failed: code={res.retcode}, comment={res.comment}")
-                    return None
 
-            logger.info(f"✅ Copied trade to {client.name} ({client.login}) | Ticket: {res.order} | Vol: {volume} | Price: {price}")
-            return res.order
+            # 1. Fallback for 10016 (Invalid Stops): Open position first without stops, then set SL/TP
+            if res.retcode == 10016:
+                logger.warning(f"Client {client.login} reported Invalid Stops (10016). Retrying open without stops and attaching SL/TP...")
+                request["sl"] = 0.0
+                request["tp"] = 0.0
+                res = mt5.order_send(request)
+
+            # 2. Fallback for 10030 (Unsupported filling mode)
+            if res.retcode == 10030:
+                for fallback in [mt5.ORDER_FILLING_RETURN, mt5.ORDER_FILLING_FOK, mt5.ORDER_FILLING_IOC]:
+                    if fallback != filling_type:
+                        request["type_filling"] = fallback
+                        res = mt5.order_send(request)
+                        if res.retcode == mt5.TRADE_RETCODE_DONE:
+                            break
+
+            if res.retcode != mt5.TRADE_RETCODE_DONE:
+                logger.error(f"Client {client.login} Open Order Failed: code={res.retcode}, comment={res.comment}")
+                return None
+
+            client_ticket = res.order
+            logger.info(f"✅ Copied trade to {client.name} ({client.login}) | Ticket: {client_ticket} | Vol: {volume} | Price: {price}")
+
+            # If stops were removed for execution, attach them now
+            if (sl > 0 or tp > 0) and request["sl"] == 0.0 and request["tp"] == 0.0:
+                sltp_req = {
+                    "action": mt5.TRADE_ACTION_SLTP,
+                    "position": client_ticket,
+                    "symbol": self.symbol,
+                    "sl": sl,
+                    "tp": tp,
+                }
+                sltp_res = mt5.order_send(sltp_req)
+                if sltp_res.retcode == mt5.TRADE_RETCODE_DONE:
+                    logger.info(f"🔒 Attached SL/TP to Client {client.login} ticket #{client_ticket} (SL: {sl}, TP: {tp})")
+                else:
+                    logger.warning(f"⚠️ Could not attach exact SL/TP to #{client_ticket}: {sltp_res.comment}")
+
+            return client_ticket
 
         finally:
             # ALWAYS restore master account, no matter what happens above
