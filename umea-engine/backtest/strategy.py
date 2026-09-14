@@ -7,7 +7,7 @@ from rich.table import Table
 from smc.swings import SwingDetector, SwingPoint, SwingType
 from smc.structure import StructureAnalyzer, StructureEventType, StructureEvent, MarketTrend
 from smc.fvg import FVGDetector, FVGType, FVGStatus, FVG
-from .engine import EventDrivenBacktester, OrderType, BacktestResults
+from .engine import EventDrivenBacktester, OrderType, TradeStatus, BacktestResults
 
 console = Console()
 
@@ -87,46 +87,78 @@ class AdvancedSMCStrategy:
         recent_sweep: Optional[StructureEvent] = None
         sweep_extreme_price: float = 0.0
 
+        # ── "One trade per H1 candle" guard state ────────────────────────────
+        # Once a trade resolves (SL or TP) inside an H1 candle, we block ALL
+        # new entries AND cancel any pending (unfilled) orders until the NEXT
+        # H1 candle starts printing.  This prevents the EA from re-entering on
+        # every deeper retrace in a solidly trending move against us.
+        blocked_h1_hour: Optional[pd.Timestamp] = None
+        prev_closed_count: int = 0
+        # ─────────────────────────────────────────────────────────────────────
+
         n = len(df_m15)
-        opens = df_m15['open'].values
-        highs = df_m15['high'].values
-        lows = df_m15['low'].values
+        opens  = df_m15['open'].values
+        highs  = df_m15['high'].values
+        lows   = df_m15['low'].values
         closes = df_m15['close'].values
-        times = df_m15.index
+        times  = df_m15.index
 
         for i in range(n):
             current_time = times[i]
-            o, h, l, c = opens[i], highs[i], lows[i], closes[i]
+            current_h1   = current_time.floor('1h')   # which H1 candle are we inside?
+            o, h, l, c  = opens[i], highs[i], lows[i], closes[i]
 
-            # Update backtester (check pending fills, stop loss, take profit)
+            # ── 1. Tick the backtester (fills, SL/TP, timeouts) ──────────────
             backtester.update_bar(i, current_time, o, h, l, c)
+
+            # ── 2. Detect new trade closures (SL or TP hit this bar) ─────────
+            new_closed_count = len(backtester.closed_trades)
+            if new_closed_count > prev_closed_count:
+                # A trade resolved on this bar — lock out the rest of this H1 candle
+                blocked_h1_hour  = current_h1
+                prev_closed_count = new_closed_count
+                # Also cancel any pending (unfilled) limit orders already placed
+                # so they don't sneak in on the next M15 bar of the same H1 candle
+                if backtester.pending_trades:
+                    for pt in backtester.pending_trades:
+                        pt.status = TradeStatus.CANCELLED
+                    backtester.pending_trades.clear()
+            # ─────────────────────────────────────────────────────────────────
 
             # Determine H1 Trend for current candle
             h1_trend = MarketTrend.NEUTRAL
             if self.use_htf_filter and df_h1 is not None:
-                # Find the most recent H1 candle before or equal to current_time
                 h1_cutoff = current_time.floor('1h')
-                h1_trend = h1_trends_by_time.get(h1_cutoff, MarketTrend.NEUTRAL)
+                h1_trend  = h1_trends_by_time.get(h1_cutoff, MarketTrend.NEUTRAL)
 
             # Check structure events on this bar
             if i in events_by_bar:
                 for ev in events_by_bar[i]:
                     if ev.event_type == StructureEventType.SWEEP_SELLSIDE:
-                        recent_sweep = ev
+                        recent_sweep        = ev
                         sweep_extreme_price = ev.wick_extreme
                     elif ev.event_type == StructureEventType.SWEEP_BUYSIDE:
-                        recent_sweep = ev
+                        recent_sweep        = ev
                         sweep_extreme_price = ev.wick_extreme
 
                     elif ev.event_type == StructureEventType.CHOCH_BULLISH:
-                        # Only enter if:
-                        # A) We had a valid Sell-Side Sweep (bear trap)
-                        # B) Session Filter allows it (London/NY Killzone)
-                        # C) H1 Trend is Bullish (or Neutral)
                         session_ok = not self.use_session_filter or self.is_in_killzone(current_time)
-                        htf_ok = not self.use_htf_filter or (h1_trend != MarketTrend.BEARISH)
+                        htf_ok     = not self.use_htf_filter or (h1_trend != MarketTrend.BEARISH)
 
-                        if recent_sweep and recent_sweep.event_type == StructureEventType.SWEEP_SELLSIDE and session_ok and htf_ok:
+                        if (
+                            recent_sweep
+                            and recent_sweep.event_type == StructureEventType.SWEEP_SELLSIDE
+                            and session_ok
+                            and htf_ok
+                        ):
+                            # ── H1 candle guard ──────────────────────────────
+                            if blocked_h1_hour == current_h1:
+                                # Trade already resolved this H1 candle — wait
+                                # for the next H1 before accepting new setups
+                                recent_sweep = None
+                                continue
+                            # ─────────────────────────────────────────────────
+
                             # Look for active Bullish FVG
                             cand_fvg = None
                             for lookback in range(i, max(0, i - 6), -1):
@@ -139,8 +171,8 @@ class AdvancedSMCStrategy:
                                     break
 
                             if cand_fvg:
-                                entry = cand_fvg.ce
-                                sl = sweep_extreme_price - 0.50
+                                entry     = cand_fvg.ce
+                                sl        = sweep_extreme_price - 0.50
                                 risk_dist = entry - sl
                                 if risk_dist > 0.50:
                                     tp = entry + (risk_dist * self.risk_to_reward)
@@ -157,9 +189,20 @@ class AdvancedSMCStrategy:
 
                     elif ev.event_type == StructureEventType.CHOCH_BEARISH:
                         session_ok = not self.use_session_filter or self.is_in_killzone(current_time)
-                        htf_ok = not self.use_htf_filter or (h1_trend != MarketTrend.BULLISH)
+                        htf_ok     = not self.use_htf_filter or (h1_trend != MarketTrend.BULLISH)
 
-                        if recent_sweep and recent_sweep.event_type == StructureEventType.SWEEP_BUYSIDE and session_ok and htf_ok:
+                        if (
+                            recent_sweep
+                            and recent_sweep.event_type == StructureEventType.SWEEP_BUYSIDE
+                            and session_ok
+                            and htf_ok
+                        ):
+                            # ── H1 candle guard ──────────────────────────────
+                            if blocked_h1_hour == current_h1:
+                                recent_sweep = None
+                                continue
+                            # ─────────────────────────────────────────────────
+
                             cand_fvg = None
                             for lookback in range(i, max(0, i - 6), -1):
                                 if lookback in fvgs_by_bar:
@@ -171,8 +214,8 @@ class AdvancedSMCStrategy:
                                     break
 
                             if cand_fvg:
-                                entry = cand_fvg.ce
-                                sl = sweep_extreme_price + 0.50
+                                entry     = cand_fvg.ce
+                                sl        = sweep_extreme_price + 0.50
                                 risk_dist = sl - entry
                                 if risk_dist > 0.50:
                                     tp = entry - (risk_dist * self.risk_to_reward)
