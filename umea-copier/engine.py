@@ -50,6 +50,10 @@ class CopierEngine:
         self.master_login: Optional[int] = None
         self.master_password: Optional[str] = None
         self.master_server: Optional[str] = None
+        # Cache for last known SL/TP per master ticket to avoid redundant login cycles
+        self.last_sltp: Dict[str, Tuple[float, float]] = {}
+        # Cooldown for failed open attempts (ticket_client -> timestamp)
+        self.failed_open_attempts: Dict[str, float] = {}
         self._load_mappings()
 
     def _load_mappings(self):
@@ -323,29 +327,53 @@ class CopierEngine:
         current_master_tickets = {str(p.ticket): p for p in master_positions}
 
         # 2. Check for NEW Master Positions to Copy
+        now = time.time()
         for m_ticket_str, m_pos in current_master_tickets.items():
             if m_ticket_str not in self.mappings:
                 self.mappings[m_ticket_str] = {}
+
+            # Cache initial SL/TP if not tracked yet
+            if m_ticket_str not in self.last_sltp:
+                self.last_sltp[m_ticket_str] = (round(m_pos.sl, 2), round(m_pos.tp, 2))
 
             for client in self.clients:
                 if client.login == master_login:
                     continue  # Skip master account itself
 
                 if client.client_id not in self.mappings[m_ticket_str]:
+                    # Check failure cooldown (don't retry failed open more than once every 30s)
+                    fail_key = f"{m_ticket_str}_{client.client_id}"
+                    if fail_key in self.failed_open_attempts:
+                        if now - self.failed_open_attempts[fail_key] < 30.0:
+                            continue  # Under cooldown, do not spam logins
+
                     logger.info(f"🔔 New master position detected: #{m_ticket_str} ({'BUY' if m_pos.order_type==0 else 'SELL'}). Copying to {client.name}...")
                     c_ticket = self.execute_client_open(client, m_pos)
                     if c_ticket:
                         self.mappings[m_ticket_str][client.client_id] = c_ticket
                         self._save_mappings()
+                        self.last_sltp[m_ticket_str] = (round(m_pos.sl, 2), round(m_pos.tp, 2))
+                        self.failed_open_attempts.pop(fail_key, None)
+                    else:
+                        # Record failure cooldown so we don't spam 10 times a second
+                        self.failed_open_attempts[fail_key] = now
+                        logger.warning(f"⚠️ Copy failed for client {client.name}. Will retry in 30s.")
 
         # 3. Check for SL/TP Modifications (Breakeven updates)
+        # CRITICAL: Only log into client if SL or TP has ACTUALLY changed on master!
         for m_ticket_str, m_pos in current_master_tickets.items():
             client_dict = self.mappings.get(m_ticket_str, {})
-            for client in self.clients:
-                c_ticket = client_dict.get(client.client_id)
-                if c_ticket:
-                    # Sync SL/TP if changed
-                    self.execute_client_modify(client, c_ticket, m_pos.sl, m_pos.tp)
+            current_sltp = (round(m_pos.sl, 2), round(m_pos.tp, 2))
+            last_known = self.last_sltp.get(m_ticket_str)
+
+            if last_known is not None and current_sltp != last_known:
+                logger.info(f"🔄 Master #{m_ticket_str} SL/TP changed: {last_known} -> {current_sltp}. Updating clients...")
+                for client in self.clients:
+                    c_ticket = client_dict.get(client.client_id)
+                    if c_ticket:
+                        self.execute_client_modify(client, c_ticket, m_pos.sl, m_pos.tp)
+                # Update cached SL/TP after sync
+                self.last_sltp[m_ticket_str] = current_sltp
 
         # 4. Check for CLOSED Master Positions
         closed_master_tickets = [t for t in self.mappings.keys() if t not in current_master_tickets]
@@ -357,6 +385,7 @@ class CopierEngine:
                     logger.info(f"🔒 Master position #{c_m_ticket} closed. Closing Client {client.name} ticket #{c_ticket}...")
                     self.execute_client_close(client, c_ticket)
             del self.mappings[c_m_ticket]
+            self.last_sltp.pop(c_m_ticket, None)
             self._save_mappings()
 
         # Re-login back to master if needed
