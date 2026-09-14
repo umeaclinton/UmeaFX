@@ -19,7 +19,6 @@ import {
   Server
 } from "lucide-react";
 import { supabasePublic } from "@/lib/supabase";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function HomePage() {
   const router = useRouter();
@@ -76,7 +75,7 @@ export default function HomePage() {
     <main className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-white transition-colors duration-200">
 
       {/* ── Header ── */}
-      <header className="border-b border-gray-200 dark:border-white/8 backdrop-blur-xl sticky top-0 z-40 bg-white/90 dark:bg-black/85 transition-colors duration-200">
+      <header className="backdrop-blur-xl sticky top-0 z-40 bg-white/90 dark:bg-black/85 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1px] shadow-lg shadow-emerald-500/20">
@@ -101,7 +100,6 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <ThemeToggle />
             <button
               onClick={() => { setSelectedPlan("ib_free_trial"); setIsModalOpen(true); }}
               className="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-500 hover:bg-emerald-400 text-white transition-all duration-200 shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
@@ -177,7 +175,7 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Layer 1 */}
-            <div className="p-5 rounded-2xl bg-gray-50 dark:bg-white/3 border border-gray-200 dark:border-white/8 flex flex-col justify-between">
+            <div className="p-5 rounded-2xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/8 flex flex-col justify-between">
               <div>
                 <div className="text-[11px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                   <span>Layer 1 • Quantitative</span>
@@ -195,7 +193,7 @@ export default function HomePage() {
             </div>
 
             {/* Layer 2 */}
-            <div className="p-5 rounded-2xl bg-gray-50 dark:bg-white/3 border border-gray-200 dark:border-white/8 flex flex-col justify-between">
+            <div className="p-5 rounded-2xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/8 flex flex-col justify-between">
               <div>
                 <div className="text-[11px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                   <span>Layer 2 • Risk Guard</span>
@@ -213,7 +211,7 @@ export default function HomePage() {
             </div>
 
             {/* Layer 3 */}
-            <div className="p-5 rounded-2xl bg-gray-50 dark:bg-white/3 border border-gray-200 dark:border-white/8 flex flex-col justify-between">
+            <div className="p-5 rounded-2xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/8 flex flex-col justify-between">
               <div>
                 <div className="text-[11px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                   <span>Layer 3 • Broker Sync</span>
@@ -319,7 +317,7 @@ export default function HomePage() {
               </div>
 
               {/* Result Card */}
-              <div className="p-6 rounded-2xl bg-gray-100 dark:bg-black/60 border border-gray-200 dark:border-white/8 space-y-4">
+              <div className="p-6 rounded-2xl bg-gray-100 dark:bg-[#111111] border border-gray-200 dark:border-white/8 space-y-4">
                 <div className="text-xs font-mono uppercase tracking-wider text-gray-400 dark:text-slate-400">
                   Calculated Order Specifications
                 </div>
@@ -334,11 +332,11 @@ export default function HomePage() {
                       {(Math.max(0.01, (calcBalance / 500) * 0.02 * calcRisk)).toFixed(2)} Lots
                     </div>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/8">
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/8">
                     <div className="text-[11px] text-gray-400 dark:text-slate-400">Default Risk Ratio</div>
                     <div className="text-sm font-bold text-gray-900 dark:text-white mt-1">1:2 R:R (30 / 60 pts)</div>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/8">
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/8">
                     <div className="text-[11px] text-gray-400 dark:text-slate-400">Breakeven Offset</div>
                     <div className="text-sm font-bold text-teal-600 dark:text-teal-400 mt-1">Auto at +15 pts</div>
                   </div>
@@ -479,7 +477,7 @@ export default function HomePage() {
 
             <div className="relative flex items-center justify-center my-5">
               <div className="border-t border-gray-200 dark:border-white/8 w-full"></div>
-              <span className="bg-white dark:bg-[#0D121C] px-3 text-[10px] text-gray-400 dark:text-slate-500 font-mono font-semibold uppercase tracking-wider">
+              <span className="bg-white dark:bg-[#0a0a0a] px-3 text-[10px] text-gray-400 dark:text-slate-500 font-mono font-semibold uppercase tracking-wider">
                 Or with email
               </span>
             </div>
@@ -492,7 +490,7 @@ export default function HomePage() {
                   placeholder="e.g. Alex Trader"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition placeholder:text-gray-400 dark:placeholder:text-slate-600"
                 />
               </div>
 
@@ -503,7 +501,7 @@ export default function HomePage() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition placeholder:text-gray-400 dark:placeholder:text-slate-600"
                 />
               </div>
 
@@ -513,14 +511,14 @@ export default function HomePage() {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button" onClick={() => setPaymentGateway("paystack")}
-                      className={`p-3 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 ${paymentGateway === "paystack" ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400" : "bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-slate-400"}`}
+                      className={`p-3 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 ${paymentGateway === "paystack" ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400" : "bg-gray-50 dark:bg-[#111111] border-gray-200 dark:border-white/10 text-gray-500 dark:text-slate-400"}`}
                     >
                       <span>💳 Paystack</span>
                       <span className="text-[10px] text-gray-400 dark:text-slate-500">Cards / Bank Transfer</span>
                     </button>
                     <button
                       type="button" onClick={() => setPaymentGateway("crypto")}
-                      className={`p-3 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 ${paymentGateway === "crypto" ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400" : "bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-slate-400"}`}
+                      className={`p-3 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 ${paymentGateway === "crypto" ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400" : "bg-gray-50 dark:bg-[#111111] border-gray-200 dark:border-white/10 text-gray-500 dark:text-slate-400"}`}
                     >
                       <span>⚡ Crypto (USDT)</span>
                       <span className="text-[10px] text-gray-400 dark:text-slate-500">TRC20 / BEP20 / BTC</span>

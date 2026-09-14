@@ -23,7 +23,6 @@ import {
   HelpCircle
 } from "lucide-react";
 import { supabasePublic } from "@/lib/supabase";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -124,7 +123,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-white dark:bg-black text-gray-900 dark:text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-white transition-colors duration-200">
 
       {/* ── Top Navbar ── */}
-      <header className="border-b border-gray-200 dark:border-white/8 bg-white/90 dark:bg-black/85 sticky top-0 z-40 backdrop-blur-xl transition-colors duration-200">
+      <header className="bg-white/90 dark:bg-black/85 sticky top-0 z-40 backdrop-blur-xl transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1px] shadow-lg shadow-emerald-500/20">
@@ -152,7 +151,6 @@ export default function DashboardPage() {
               <div className="text-xs font-bold text-gray-900 dark:text-white tracking-tight">{name}</div>
               <div className="text-[11px] font-mono text-gray-400 dark:text-slate-400">{email}</div>
             </div>
-            <ThemeToggle />
             <button
               onClick={handleLogout}
               className="p-2.5 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/10 transition"
@@ -377,7 +375,7 @@ export default function DashboardPage() {
                     placeholder="e.g. 43241092"
                     value={login}
                     onChange={(e) => setLogin(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono"
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono placeholder:text-gray-400 dark:placeholder:text-slate-600"
                   />
                 </div>
 
@@ -391,7 +389,7 @@ export default function DashboardPage() {
                       placeholder="••••••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono pr-10"
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono pr-10 placeholder:text-gray-400 dark:placeholder:text-slate-600"
                     />
                     <button
                       type="button"
@@ -411,7 +409,7 @@ export default function DashboardPage() {
                 <select
                   value={server}
                   onChange={(e) => setServer(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono dark:[color-scheme:dark]"
                 >
                   <option value="Weltrade-Real">Weltrade-Real</option>
                   <option value="Weltrade-Demo">Weltrade-Demo</option>
@@ -435,7 +433,7 @@ export default function DashboardPage() {
                   <select
                     value={riskMode}
                     onChange={(e) => setRiskMode(e.target.value as any)}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition"
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition dark:[color-scheme:dark]"
                   >
                     <option value="multiplier">Risk Multiplier (e.g. 1.0x master lot)</option>
                     <option value="fixed">Fixed Lot Size (e.g. 0.02 lots)</option>
@@ -450,7 +448,7 @@ export default function DashboardPage() {
                     type="number" step="0.01" required
                     value={riskValue}
                     onChange={(e) => setRiskValue(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono"
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono placeholder:text-gray-400 dark:placeholder:text-slate-600"
                   />
                 </div>
               </div>
@@ -463,7 +461,7 @@ export default function DashboardPage() {
                   type="number" step="0.01" required
                   value={maxLot}
                   onChange={(e) => setMaxLot(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono dark:[color-scheme:dark]"
                 />
                 <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1.5">
                   Protective safety cap. No single order will ever exceed this lot volume regardless of multiplier calculations.
