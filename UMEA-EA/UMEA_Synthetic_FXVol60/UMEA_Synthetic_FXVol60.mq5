@@ -45,8 +45,8 @@ input int      InpMaxDailyLosses       = 3;        // Max Daily Losses Before Pa
 
 input group "=== HUD Panel Appearance ==="
 input bool     InpShowHUD              = true;               // Show Dashboard Panel
-input color    InpHUDPanelBg           = C'15,23,42';        // Panel Background Color (Dark Slate/Navy)
-input color    InpHUDBorder            = C'59,130,246';      // Panel Border Color (Dodger/Royal Blue)
+input color    InpHUDPanelBg           = clrBlack;           // Panel Background Color (Solid Pitch Black)
+input color    InpHUDBorder            = C'80,80,80';        // Panel Border Color (Subtle Gray Outline)
 input int      InpHUDXOffset           = 15;                 // Panel X Distance from Left
 input int      InpHUDYOffset           = 25;                 // Panel Y Distance from Top
 
@@ -55,7 +55,7 @@ input int      InpHUDYOffset           = 25;                 // Panel Y Distance
 //+------------------------------------------------------------------+
 //| HUD Object Helper Functions                                      |
 //+------------------------------------------------------------------+
-void SetHUDLabel(string name, string text, int x, int y, color clr, int font_size = 9, bool bold = false)
+void SetHUDLabel(string name, string text, int x, int y, color clr = clrWhite, int font_size = 9)
 {
    string obj_name = HUD_PREFIX + name;
    if(ObjectFind(0, obj_name) < 0)
@@ -69,9 +69,9 @@ void SetHUDLabel(string name, string text, int x, int y, color clr, int font_siz
    ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, y);
    ObjectSetString(0, obj_name, OBJPROP_TEXT, text);
-   ObjectSetString(0, obj_name, OBJPROP_FONT, bold ? "Segoe UI Bold" : "Segoe UI");
+   ObjectSetString(0, obj_name, OBJPROP_FONT, "Consolas");
    ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, font_size);
-   ObjectSetInteger(0, obj_name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, obj_name, OBJPROP_COLOR, clrWhite); // Always pure white text
 }
 
 void SetHUDPanel(string name, int x, int y, int w, int h, color bg_color, color border_color)
@@ -84,7 +84,7 @@ void SetHUDPanel(string name, int x, int y, int w, int h, color bg_color, color 
       ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, obj_name, OBJPROP_SELECTED, false);
       ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, obj_name, OBJPROP_BACK, false); // Draw on top of chart background
+      ObjectSetInteger(0, obj_name, OBJPROP_BACK, false); // In front of chart candles
    }
    ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, y);
@@ -98,6 +98,7 @@ void SetHUDPanel(string name, int x, int y, int w, int h, color bg_color, color 
 void RemoveHUD()
 {
    ObjectsDeleteAll(0, HUD_PREFIX);
+   ChartSetString(0, CHART_COMMENT, "");
    Comment("");
 }
 
@@ -303,23 +304,22 @@ void UpdateHUD(bool is_locked, int seconds_left)
 
    int px = InpHUDXOffset;
    int py = InpHUDYOffset;
-   int pw = 450;
-   int ph = is_locked ? 360 : 340;
+   int pw = 620;
+   int ph = is_locked ? 490 : 460;
 
-   // 1. Solid Background Panel
-   color border_col = is_locked ? C'239,68,68' : InpHUDBorder;
-   SetHUDPanel("BG", px, py, pw, ph, InpHUDPanelBg, border_col);
+   // 1. Solid Background Panel (Pitch Black with clean outline)
+   SetHUDPanel("BG", px, py, pw, ph, InpHUDPanelBg, InpHUDBorder);
 
-   // 2. Panel Content (Row by Row)
-   int y = py + 10;
-   int x = px + 12;
-   int line_h = 17;
+   // 2. Panel Content (Row by Row, generous 22px spacing)
+   int y = py + 12;
+   int x = px + 14;
+   int line_h = 22;
 
    // Title & Subtitle
-   SetHUDLabel("Title", "UMEA FX Vol 60 Master Engine v2.20", x, y, C'248,250,252', 10, true);
+   SetHUDLabel("Title",    "UMEA FX Vol 60 Master Engine v2.20", x, y, clrWhite, 10);
+   y += line_h;
+   SetHUDLabel("SubTitle", "Mode 3: Body Retrace  |  Mode 2: Daily Fade", x, y, clrWhite, 8);
    y += line_h + 2;
-   SetHUDLabel("SubTitle", "Mode 3: Body Retrace  |  Mode 2: Daily Fade", x, y, C'148,163,184', 8, false);
-   y += line_h + 4;
 
    // Lock Banner if active
    if(is_locked)
@@ -327,8 +327,8 @@ void UpdateHUD(bool is_locked, int seconds_left)
       int mm = seconds_left / 60;
       int ss = seconds_left % 60;
       string lock_txt = StringFormat(">>> 🔒 HOUR LOCKED | RESUMING IN: %02d:%02d <<<", mm, ss);
-      SetHUDLabel("LockBanner", lock_txt, x, y, C'239,68,68', 9, true);
-      y += line_h + 2;
+      SetHUDLabel("LockBanner", lock_txt, x, y, clrWhite, 9);
+      y += line_h;
    }
    else
    {
@@ -337,45 +337,46 @@ void UpdateHUD(bool is_locked, int seconds_left)
    }
 
    // Divider
-   SetHUDLabel("Div1", "--------------------------------------------------------------------------------", x, y, C'51,65,85', 8, false);
+   SetHUDLabel("Div1", "--------------------------------------------------------------------------------", x, y, clrWhite, 8);
    y += line_h - 4;
 
    // Core Market Info
-   SetHUDLabel("ExecMethod", StringFormat("Execution Method:   %s", exec_mode_str), x, y, C'226,232,240', 8, false);
+   SetHUDLabel("ExecMethod", StringFormat("Execution Method:   %s", exec_mode_str), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("DailyOpen",   StringFormat("Daily Open:         %.2f    |  Current Bid: %.2f", daily_open, bid), x, y, C'203,213,225', 8, false);
+   SetHUDLabel("DailyOpen",   StringFormat("Daily Open:         %.2f    |  Current Bid: %.2f", daily_open, bid), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("DistOpen",    StringFormat("Dist from Open:     %+.2f pts", dist_open), x, y, (dist_open >= 0 ? C'74,222,128' : C'248,113,113'), 8, false);
+   SetHUDLabel("DistOpen",    StringFormat("Dist from Open:     %+.2f pts", dist_open), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("MarketZone",  StringFormat("Market Zone:        %s", zone_str), x, y, zone_clr, 8, true);
-   y += line_h + 4;
+   SetHUDLabel("MarketZone",  StringFormat("Market Zone:        %s", zone_str), x, y, clrWhite, 8);
+   y += line_h + 2;
 
    // Divider
-   SetHUDLabel("Div2", "--------------------------------------------------------------------------------", x, y, C'51,65,85', 8, false);
+   SetHUDLabel("Div2", "--------------------------------------------------------------------------------", x, y, clrWhite, 8);
    y += line_h - 4;
 
    // Setup & Distance
-   SetHUDLabel("Setup",    StringFormat("Setup:       %s", setup_str), x, y, setup_clr, 8, true);
+   SetHUDLabel("Setup",    StringFormat("Setup:              %s", setup_str), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("Target",   StringFormat("Target:      %s", dist_exec_str), x, y, is_locked ? C'248,113,113' : C'203,213,225', 8, false);
-   y += line_h + 4;
+   SetHUDLabel("Target",   StringFormat("Target:             %s", dist_exec_str), x, y, clrWhite, 8);
+   y += line_h + 2;
 
    // Divider
-   SetHUDLabel("Div3", "--------------------------------------------------------------------------------", x, y, C'51,65,85', 8, false);
+   SetHUDLabel("Div3", "--------------------------------------------------------------------------------", x, y, clrWhite, 8);
    y += line_h - 4;
 
    // Configuration & Status
-   SetHUDLabel("Mode3Cfg", StringFormat("Mode 3 Config:      Entry %.1f%% | SL %.0f pts | TP %.0f pts", InpBodyEntryPct, InpBodySL, InpBodyTP), x, y, C'148,163,184', 8, false);
+   SetHUDLabel("Mode3Cfg", StringFormat("Mode 3 Config:      Entry %.1f%% | SL %.0f pts | TP %.0f pts", InpBodyEntryPct, InpBodySL, InpBodyTP), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("Mode2Cfg", StringFormat("Mode 2 Config:      Bdry %.0f pts | SL %.0f pts | TP %.0f pts", InpFadeBoundary, InpFadeSL, InpFadeTP), x, y, C'148,163,184', 8, false);
+   SetHUDLabel("Mode2Cfg", StringFormat("Mode 2 Config:      Bdry %.0f pts | SL %.0f pts | TP %.0f pts", InpFadeBoundary, InpFadeSL, InpFadeTP), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("BEStatus", StringFormat("Breakeven:          %s", be), x, y, C'203,213,225', 8, false);
+   SetHUDLabel("BEStatus", StringFormat("Breakeven:          %s", be), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("CBStatus", StringFormat("Circuit Breaker:    %s", cb), x, y, cb_clr, 8, true);
+   SetHUDLabel("CBStatus", StringFormat("Circuit Breaker:    %s", cb), x, y, clrWhite, 8);
    y += line_h;
-   SetHUDLabel("Trades",   StringFormat("Active Trades:      %d", ExtTradeManager.TotalActive()), x, y, C'248,250,252', 8, true);
+   SetHUDLabel("Trades",   StringFormat("Active Trades:      %d", ExtTradeManager.TotalActive()), x, y, clrWhite, 8);
 
-   // Clear old Comment text to ensure no ghosting
+   // Force clear MT5 chart comment so nothing bleeds through
+   ChartSetString(0, CHART_COMMENT, "");
    Comment("");
 }
 
