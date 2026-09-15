@@ -43,6 +43,64 @@ input double   InpFixedLot             = 0.10;     // Fixed Lot Size
 input double   InpRiskPercent          = 1.0;      // Risk Per Trade (% of Balance)
 input int      InpMaxDailyLosses       = 3;        // Max Daily Losses Before Pausing
 
+input group "=== HUD Panel Appearance ==="
+input bool     InpShowHUD              = true;               // Show Dashboard Panel
+input color    InpHUDPanelBg           = C'15,23,42';        // Panel Background Color (Dark Slate/Navy)
+input color    InpHUDBorder            = C'59,130,246';      // Panel Border Color (Dodger/Royal Blue)
+input int      InpHUDXOffset           = 15;                 // Panel X Distance from Left
+input int      InpHUDYOffset           = 25;                 // Panel Y Distance from Top
+
+#define HUD_PREFIX "UMEA_HUD_"
+
+//+------------------------------------------------------------------+
+//| HUD Object Helper Functions                                      |
+//+------------------------------------------------------------------+
+void SetHUDLabel(string name, string text, int x, int y, color clr, int font_size = 9, bool bold = false)
+{
+   string obj_name = HUD_PREFIX + name;
+   if(ObjectFind(0, obj_name) < 0)
+   {
+      ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, obj_name, OBJPROP_SELECTED, false);
+      ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true);
+   }
+   ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, y);
+   ObjectSetString(0, obj_name, OBJPROP_TEXT, text);
+   ObjectSetString(0, obj_name, OBJPROP_FONT, bold ? "Segoe UI Bold" : "Segoe UI");
+   ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, font_size);
+   ObjectSetInteger(0, obj_name, OBJPROP_COLOR, clr);
+}
+
+void SetHUDPanel(string name, int x, int y, int w, int h, color bg_color, color border_color)
+{
+   string obj_name = HUD_PREFIX + name;
+   if(ObjectFind(0, obj_name) < 0)
+   {
+      ObjectCreate(0, obj_name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, obj_name, OBJPROP_SELECTED, false);
+      ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, obj_name, OBJPROP_BACK, false); // Draw on top of chart background
+   }
+   ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, obj_name, OBJPROP_XSIZE, w);
+   ObjectSetInteger(0, obj_name, OBJPROP_YSIZE, h);
+   ObjectSetInteger(0, obj_name, OBJPROP_BGCOLOR, bg_color);
+   ObjectSetInteger(0, obj_name, OBJPROP_BORDER_COLOR, border_color);
+   ObjectSetInteger(0, obj_name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+}
+
+void RemoveHUD()
+{
+   ObjectsDeleteAll(0, HUD_PREFIX);
+   Comment("");
+}
+
 //+------------------------------------------------------------------+
 //| Globals                                                          |
 //+------------------------------------------------------------------+
@@ -133,14 +191,20 @@ int OnInit()
 
 void OnDeinit(const int reason)
 {
-   Comment("");
+   RemoveHUD();
 }
 
 //+------------------------------------------------------------------+
-//| HUD                                                              |
+//| HUD Render Function with Solid Background Panel                 |
 //+------------------------------------------------------------------+
 void UpdateHUD(bool is_locked, int seconds_left)
 {
+   if(!InpShowHUD)
+   {
+      RemoveHUD();
+      return;
+   }
+
    double bid        = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double ask        = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double daily_open = ExtTrendEngine.GetDailyOpen();
@@ -148,18 +212,29 @@ void UpdateHUD(bool is_locked, int seconds_left)
    ENUM_DAILY_ZONE zone = ExtTrendEngine.GetZone(bid);
 
    string zone_str = "ZONE 1: NORMAL (Mode 3 Active)";
-   if(zone == ZONE_CEILING_EXTREME) zone_str = "ZONE 2: CEILING - Mode 2 Fade SHORT";
-   else if(zone == ZONE_FLOOR_EXTREME) zone_str = "ZONE 2: FLOOR - Mode 2 Fade LONG";
+   color  zone_clr = C'34,197,94'; // Emerald green
+   if(zone == ZONE_CEILING_EXTREME)
+   {
+      zone_str = "ZONE 2: CEILING (Mode 2 Fade SHORT)";
+      zone_clr = C'239,68,68'; // Red
+   }
+   else if(zone == ZONE_FLOOR_EXTREME)
+   {
+      zone_str = "ZONE 2: FLOOR (Mode 2 Fade LONG)";
+      zone_clr = C'59,130,246'; // Blue
+   }
 
    string setup_str = "";
    string dist_exec_str = "";
+   color  setup_clr = C'226,232,240'; // Soft white
 
    if(is_locked)
    {
       int mm = seconds_left / 60;
       int ss = seconds_left % 60;
-      setup_str     = "🔒 LOCKED (Trade closed this hour). NO RE-ENTRY!";
+      setup_str     = "🔒 LOCKED: Trade closed this hour (SL/BE/TP).";
       dist_exec_str = StringFormat("⏳ NEXT CANDLE COUNTDOWN: %02d:%02d (DO NOT TRADE)", mm, ss);
+      setup_clr     = C'248,113,113'; // Vibrant light red
    }
    else if(ExtTrendEngine.IsBodyBullValid())
    {
@@ -172,15 +247,18 @@ void UpdateHUD(bool is_locked, int seconds_left)
       if(ExtExecutedThisBar)
       {
          dist_exec_str = "Status: [EXECUTED / POSITION ACTIVE THIS BAR]";
+         setup_clr     = C'250,204,21'; // Yellow
       }
       else if(dist_to_target <= 0)
       {
          dist_exec_str = StringFormat("Distance to Execution: AT OR BELOW TARGET (%+.2f pts)", dist_to_target);
+         setup_clr     = C'74,222,128'; // Lime green
       }
       else
       {
          dist_exec_str = StringFormat("Distance to Execution: %.2f pts away (Needs dip of %.2f pts)", 
                                       dist_to_target, dist_to_target);
+         setup_clr     = C'56,189,248'; // Sky blue
       }
    }
    else if(ExtTrendEngine.IsBodyBearValid())
@@ -194,64 +272,111 @@ void UpdateHUD(bool is_locked, int seconds_left)
       if(ExtExecutedThisBar)
       {
          dist_exec_str = "Status: [EXECUTED / POSITION ACTIVE THIS BAR]";
+         setup_clr     = C'250,204,21'; // Yellow
       }
       else if(dist_to_target <= 0)
       {
          dist_exec_str = StringFormat("Distance to Execution: AT OR ABOVE TARGET (%+.2f pts)", dist_to_target);
+         setup_clr     = C'248,113,113'; // Light red
       }
       else
       {
          dist_exec_str = StringFormat("Distance to Execution: %.2f pts away (Needs rally of %.2f pts)", 
                                       dist_to_target, dist_to_target);
+         setup_clr     = C'251,146,60'; // Light orange
       }
    }
    else
    {
-      setup_str = StringFormat("Body too small (%.0f pts < %.0f min body filter)",
-                               ExtTrendEngine.GetPrevBodyPts(), InpMinBodyPts);
+      setup_str     = StringFormat("Body too small (%.0f pts < %.0f min body filter)",
+                                   ExtTrendEngine.GetPrevBodyPts(), InpMinBodyPts);
       dist_exec_str = "Distance to Execution: N/A (Indecision candle)";
+      setup_clr     = C'148,163,184'; // Muted slate
    }
 
    string exec_mode_str = InpUseMarketExecution ? "MARKET ON HIT" : "LIMIT ORDER";
-   string cb  = ExtTradeManager.IsCircuitBreakerHit() ? "[PAUSED - MAX LOSSES HIT]" : "NORMAL";
+   string cb  = ExtTradeManager.IsCircuitBreakerHit() ? "PAUSED (MAX LOSSES)" : "NORMAL (ACTIVE)";
+   color  cb_clr = ExtTradeManager.IsCircuitBreakerHit() ? C'239,68,68' : C'34,197,94';
    string be  = InpEnableBreakeven
-                ? StringFormat("ON (At +%.0f pts -> Lock +%.0f pts)", InpBETriggerPoints, InpBELockPoints)
+                ? StringFormat("ON (+%.0f pts -> Lock +%.0f pts)", InpBETriggerPoints, InpBELockPoints)
                 : "OFF";
 
-   string lock_banner = "";
+   int px = InpHUDXOffset;
+   int py = InpHUDYOffset;
+   int pw = 450;
+   int ph = is_locked ? 360 : 340;
+
+   // 1. Solid Background Panel
+   color border_col = is_locked ? C'239,68,68' : InpHUDBorder;
+   SetHUDPanel("BG", px, py, pw, ph, InpHUDPanelBg, border_col);
+
+   // 2. Panel Content (Row by Row)
+   int y = py + 10;
+   int x = px + 12;
+   int line_h = 17;
+
+   // Title & Subtitle
+   SetHUDLabel("Title", "UMEA FX Vol 60 Master Engine v2.20", x, y, C'248,250,252', 10, true);
+   y += line_h + 2;
+   SetHUDLabel("SubTitle", "Mode 3: Body Retrace  |  Mode 2: Daily Fade", x, y, C'148,163,184', 8, false);
+   y += line_h + 4;
+
+   // Lock Banner if active
    if(is_locked)
    {
       int mm = seconds_left / 60;
       int ss = seconds_left % 60;
-      lock_banner = StringFormat("  >>> 🔒 HOUR LOCKED (SL/BE/TP HIT) | NEXT IN: %02d:%02d <<<\n", mm, ss);
+      string lock_txt = StringFormat(">>> 🔒 HOUR LOCKED | RESUMING IN: %02d:%02d <<<", mm, ss);
+      SetHUDLabel("LockBanner", lock_txt, x, y, C'239,68,68', 9, true);
+      y += line_h + 2;
+   }
+   else
+   {
+      // Clean up banner if unlocked
+      ObjectDelete(0, HUD_PREFIX + "LockBanner");
    }
 
-   string hud =
-      "===================================================\n"
-      "  UmeaFX FX Vol 60 Master Engine v2.20             \n"
-      "  Mode 3: Body Retrace | Mode 2: Daily Fade        \n" +
-      lock_banner +
-      "===================================================\n"
-      "Execution Method: " + exec_mode_str + "\n" +
-      "Daily Open:       " + DoubleToString(daily_open, 2) + "\n" +
-      "Current Bid:      " + DoubleToString(bid, 2) + "\n" +
-      "Dist from Open:   " + StringFormat("%+.2f pts", dist_open) + "\n" +
-      "Market Zone:      " + zone_str + "\n" +
-      "---------------------------------------------------\n" +
-      "Current Setup:    " + setup_str + "\n" +
-      "Execution Target: " + dist_exec_str + "\n" +
-      "---------------------------------------------------\n" +
-      StringFormat("Mode 3 Config:    Entry %.1f%% | SL %.0f pts | TP %.0f pts\n",
-                   InpBodyEntryPct, InpBodySL, InpBodyTP) +
-      StringFormat("Mode 2 Config:    Bdry %.0f pts | SL %.0f pts | TP %.0f pts\n",
-                   InpFadeBoundary, InpFadeSL, InpFadeTP) +
-      "---------------------------------------------------\n" +
-      "Breakeven:        " + be + "\n" +
-      "Circuit Breaker:  " + cb + "\n" +
-      "Active Trades:    " + IntegerToString(ExtTradeManager.TotalActive()) + "\n" +
-      "===================================================";
+   // Divider
+   SetHUDLabel("Div1", "--------------------------------------------------------------------------------", x, y, C'51,65,85', 8, false);
+   y += line_h - 4;
 
-   Comment(hud);
+   // Core Market Info
+   SetHUDLabel("ExecMethod", StringFormat("Execution Method:   %s", exec_mode_str), x, y, C'226,232,240', 8, false);
+   y += line_h;
+   SetHUDLabel("DailyOpen",   StringFormat("Daily Open:         %.2f    |  Current Bid: %.2f", daily_open, bid), x, y, C'203,213,225', 8, false);
+   y += line_h;
+   SetHUDLabel("DistOpen",    StringFormat("Dist from Open:     %+.2f pts", dist_open), x, y, (dist_open >= 0 ? C'74,222,128' : C'248,113,113'), 8, false);
+   y += line_h;
+   SetHUDLabel("MarketZone",  StringFormat("Market Zone:        %s", zone_str), x, y, zone_clr, 8, true);
+   y += line_h + 4;
+
+   // Divider
+   SetHUDLabel("Div2", "--------------------------------------------------------------------------------", x, y, C'51,65,85', 8, false);
+   y += line_h - 4;
+
+   // Setup & Distance
+   SetHUDLabel("Setup",    StringFormat("Setup:       %s", setup_str), x, y, setup_clr, 8, true);
+   y += line_h;
+   SetHUDLabel("Target",   StringFormat("Target:      %s", dist_exec_str), x, y, is_locked ? C'248,113,113' : C'203,213,225', 8, false);
+   y += line_h + 4;
+
+   // Divider
+   SetHUDLabel("Div3", "--------------------------------------------------------------------------------", x, y, C'51,65,85', 8, false);
+   y += line_h - 4;
+
+   // Configuration & Status
+   SetHUDLabel("Mode3Cfg", StringFormat("Mode 3 Config:      Entry %.1f%% | SL %.0f pts | TP %.0f pts", InpBodyEntryPct, InpBodySL, InpBodyTP), x, y, C'148,163,184', 8, false);
+   y += line_h;
+   SetHUDLabel("Mode2Cfg", StringFormat("Mode 2 Config:      Bdry %.0f pts | SL %.0f pts | TP %.0f pts", InpFadeBoundary, InpFadeSL, InpFadeTP), x, y, C'148,163,184', 8, false);
+   y += line_h;
+   SetHUDLabel("BEStatus", StringFormat("Breakeven:          %s", be), x, y, C'203,213,225', 8, false);
+   y += line_h;
+   SetHUDLabel("CBStatus", StringFormat("Circuit Breaker:    %s", cb), x, y, cb_clr, 8, true);
+   y += line_h;
+   SetHUDLabel("Trades",   StringFormat("Active Trades:      %d", ExtTradeManager.TotalActive()), x, y, C'248,250,252', 8, true);
+
+   // Clear old Comment text to ensure no ghosting
+   Comment("");
 }
 
 //+------------------------------------------------------------------+
