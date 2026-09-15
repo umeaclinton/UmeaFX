@@ -271,8 +271,8 @@ class CopierEngine:
                 logger.warning(f"[MODIFY] Could not select symbol {self.symbol} on client {client.login}")
 
             sym_info = mt5.symbol_info(self.symbol)
-            digits  = sym_info.digits if sym_info else 3
-            point   = sym_info.point  if sym_info else 0.001
+            digits      = sym_info.digits            if sym_info else 3
+            point       = sym_info.point             if sym_info else 0.001
             stops_level = sym_info.trade_stops_level if sym_info else 0
 
             # ── 2. Verify position still exists on client ────────────────────
@@ -309,23 +309,46 @@ class CopierEngine:
                 f"retcode={res.retcode} | comment={res.comment} | SL={sl} TP={tp}"
             )
 
-            # ── 4. Retry: stops-level violation — pull SL back by min distance ─
+            # ── 4. Retry: stops-level violation — pull SL to nearest valid level ─
             if res.retcode == 10016 and sym_info and stops_level > 0:
                 tick = mt5.symbol_info_tick(self.symbol)
                 p    = pos[0]
+                current_client_sl = round(p.sl, digits)  # Client's CURRENT SL before any change
+
                 if tick:
                     min_dist = (stops_level + 2) * point
-                    if p.type == 0:   # BUY  — SL must be below bid
-                        adjusted_sl = round(min(sl, tick.bid - min_dist), digits)
+                    if p.type == 0:   # BUY — SL must be below bid
+                        # Highest valid SL we can set = bid - min_dist
+                        max_valid_sl = round(tick.bid - min_dist, digits)
+                        # Only raise SL, never lower it below client's existing SL
+                        if max_valid_sl > current_client_sl:
+                            adjusted_sl = max_valid_sl
+                        else:
+                            logger.warning(
+                                f"[MODIFY] Stop-level ({stops_level}pts) prevents SL move for "
+                                f"BUY #{client_ticket}. Current SL={current_client_sl} already "
+                                f"near bid. Keeping existing SL."
+                            )
+                            return False
                     else:             # SELL — SL must be above ask
-                        adjusted_sl = round(max(sl, tick.ask + min_dist), digits)
+                        # Lowest valid SL we can set = ask + min_dist
+                        min_valid_sl = round(tick.ask + min_dist, digits)
+                        # Only lower SL, never raise it above client's existing SL
+                        if sl > 0 and min_valid_sl < current_client_sl:
+                            adjusted_sl = min_valid_sl
+                        else:
+                            logger.warning(
+                                f"[MODIFY] Stop-level ({stops_level}pts) prevents SL move for "
+                                f"SELL #{client_ticket}. Keeping existing SL."
+                            )
+                            return False
 
                     request["sl"] = adjusted_sl
                     res2 = mt5.order_send(request)
                     if res2.retcode == mt5.TRADE_RETCODE_DONE:
                         logger.info(
                             f"✅ [MODIFY RETRY] {client.name} #{client_ticket} "
-                            f"→ Adjusted SL={adjusted_sl} (stop-level fix applied)"
+                            f"→ Adjusted SL={adjusted_sl} (stop-level, closest valid level)"
                         )
                         return True
                     logger.error(
@@ -342,26 +365,32 @@ class CopierEngine:
         finally:
             self._restore_master()
 
-        # ────────────────────────────────────────────────────────────────────
-
     def execute_client_close(self, client: ClientAccount, client_ticket: int) -> bool:
         """Login to client account, close position, then IMMEDIATELY restore master session."""
         if not mt5.login(login=client.login, password=client.password, server=client.server):
+            logger.error(f"[CLOSE] Failed to login to Client {client.name} ({client.login}): {mt5.last_error()}")
             self._restore_master()
             return False
 
         try:
+            # Ensure symbol is in Market Watch before any operation
+            mt5.symbol_select(self.symbol, True)
+
             pos = mt5.positions_get(ticket=client_ticket)
             if not pos or len(pos) == 0:
-                # Position already closed (hit TP or SL)
+                logger.info(f"[CLOSE] Client {client.name} #{client_ticket} already closed (SL/TP hit).")
                 return True
 
-            p = pos[0]
+            p    = pos[0]
             tick = mt5.symbol_info_tick(self.symbol)
-            price = tick.bid if p.type == mt5.ORDER_TYPE_BUY else tick.ask
+            if not tick:
+                logger.error(f"[CLOSE] Could not get tick for {self.symbol} on client {client.login}")
+                return False
+
+            price      = tick.bid if p.type == mt5.ORDER_TYPE_BUY else tick.ask
             close_type = mt5.ORDER_TYPE_SELL if p.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
 
-            sym_info = mt5.symbol_info(self.symbol)
+            sym_info     = mt5.symbol_info(self.symbol)
             filling_mode = sym_info.filling_mode if sym_info else 0
             if filling_mode & 1:
                 filling_type = mt5.ORDER_FILLING_FOK
@@ -371,27 +400,47 @@ class CopierEngine:
                 filling_type = mt5.ORDER_FILLING_RETURN
 
             request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "position": client_ticket,
-                "symbol": self.symbol,
-                "volume": p.volume,
-                "type": close_type,
-                "price": price,
-                "deviation": 30,
-                "magic": 606060,
-                "comment": f"UMEA-Close-{client_ticket}",
-                "type_time": mt5.ORDER_TIME_GTC,
+                "action":       mt5.TRADE_ACTION_DEAL,
+                "position":     client_ticket,
+                "symbol":       self.symbol,
+                "volume":       p.volume,
+                "type":         close_type,
+                "price":        price,
+                "deviation":    30,
+                "magic":        606060,
+                "comment":      f"UMEA-Close-{client_ticket}",
+                "type_time":    mt5.ORDER_TIME_GTC,
                 "type_filling": filling_type,
             }
             res = mt5.order_send(request)
-            if res.retcode != mt5.TRADE_RETCODE_DONE and res.retcode == 10030:
+
+            # Retry all filling modes on any failure, not just 10030
+            if res.retcode != mt5.TRADE_RETCODE_DONE:
+                logger.warning(
+                    f"[CLOSE] First attempt failed retcode={res.retcode} ({res.comment}). "
+                    f"Trying all filling modes..."
+                )
                 for fallback in [mt5.ORDER_FILLING_RETURN, mt5.ORDER_FILLING_FOK, mt5.ORDER_FILLING_IOC]:
                     if fallback != filling_type:
                         request["type_filling"] = fallback
                         res = mt5.order_send(request)
                         if res.retcode == mt5.TRADE_RETCODE_DONE:
                             break
-            return res.retcode == mt5.TRADE_RETCODE_DONE
+
+            if res.retcode == mt5.TRADE_RETCODE_DONE:
+                logger.info(f"✅ [CLOSE] {client.name} ({client.login}) #{client_ticket} closed successfully.")
+                return True
+            else:
+                logger.error(
+                    f"❌ [CLOSE] {client.name} ({client.login}) #{client_ticket} FAILED "
+                    f"retcode={res.retcode} | comment={res.comment}"
+                )
+                return False
+
+        except Exception as e:
+            logger.error(f"[CLOSE] Exception for client {client.login}: {e}", exc_info=True)
+            return False
+
         finally:
             self._restore_master()
 
