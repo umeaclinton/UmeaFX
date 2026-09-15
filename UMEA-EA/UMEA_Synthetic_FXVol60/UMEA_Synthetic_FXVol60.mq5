@@ -48,9 +48,57 @@ input int      InpMaxDailyLosses       = 3;        // Max Daily Losses Before Pa
 //+------------------------------------------------------------------+
 CTrendEngine   ExtTrendEngine;
 CTradeManager  ExtTradeManager;
-datetime       ExtLastBarH1       = 0;
-bool           ExtExecutedThisBar = false;
-bool           ExtSLOrTPHitThisBar = false;  // Blocks re-entry after SL or TP fires this H1 bar
+datetime       ExtLastBarH1        = 0;
+bool           ExtExecutedThisBar  = false;
+datetime       ExtLockedH1Bar      = 0;  // Holds the exact H1 bar open time that is LOCKED
+
+//+------------------------------------------------------------------+
+//| Check if Current H1 Candle is Locked                             |
+//| (Trade closed on SL, BE, or TP in this current H1 candle)         |
+//+------------------------------------------------------------------+
+bool IsCurrentH1Locked(int &out_seconds_left)
+{
+   datetime current_h1 = iTime(_Symbol, PERIOD_H1, 0);
+   if(current_h1 <= 0)
+   {
+      out_seconds_left = 0;
+      return false;
+   }
+
+   datetime now = TimeCurrent();
+   datetime h1_end = current_h1 + 3600;
+   out_seconds_left = (int)(h1_end - now);
+   if(out_seconds_left < 0)
+      out_seconds_left = 0;
+
+   // 1. Check in-memory lock
+   if(ExtLockedH1Bar == current_h1)
+      return true;
+
+   // 2. Fail-safe: Check MT5 account history for this exact H1 bar
+   if(HistorySelect(current_h1, now))
+   {
+      int total_deals = HistoryDealsTotal();
+      for(int i = total_deals - 1; i >= 0; i--)
+      {
+         ulong deal_ticket = HistoryDealGetTicket(i);
+         if(deal_ticket > 0)
+         {
+            long magic = HistoryDealGetInteger(deal_ticket, DEAL_MAGIC);
+            string sym = HistoryDealGetString(deal_ticket, DEAL_SYMBOL);
+            ENUM_DEAL_ENTRY entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket, DEAL_ENTRY);
+
+            if(magic == (long)InpMagicNumber && sym == _Symbol && entry == DEAL_ENTRY_OUT)
+            {
+               ExtLockedH1Bar = current_h1;  // Lock established from history
+               return true;
+            }
+         }
+      }
+   }
+
+   return false;
+}
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                            |
@@ -65,8 +113,17 @@ int OnInit()
    ExtTradeManager.Init(_Symbol, InpMagicNumber, InpUseFixedLot, InpFixedLot,
                         InpRiskPercent, InpMaxDailyLosses,
                         InpEnableBreakeven, InpBETriggerPoints, InpBELockPoints);
-   ExtLastBarH1 = 0;
+   ExtLastBarH1       = 0;
    ExtExecutedThisBar = false;
+   ExtLockedH1Bar     = 0;
+
+   // Check immediately on startup if current H1 already had a closed trade
+   int sec_init = 0;
+   if(IsCurrentH1Locked(sec_init))
+   {
+      PrintFormat(">> ⚠️ EA started while current H1 candle is LOCKED! Countdown remaining: %02d:%02d",
+                  sec_init / 60, sec_init % 60);
+   }
 
    Print("UmeaFX FX Vol 60 v2.20 ready | Execution Mode: ", 
          (InpUseMarketExecution ? "MARKET ON HIT" : "LIMIT ORDERS"),
@@ -82,7 +139,7 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 //| HUD                                                              |
 //+------------------------------------------------------------------+
-void UpdateHUD()
+void UpdateHUD(bool is_locked, int seconds_left)
 {
    double bid        = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double ask        = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
@@ -97,7 +154,14 @@ void UpdateHUD()
    string setup_str = "";
    string dist_exec_str = "";
 
-   if(ExtTrendEngine.IsBodyBullValid())
+   if(is_locked)
+   {
+      int mm = seconds_left / 60;
+      int ss = seconds_left % 60;
+      setup_str     = "🔒 LOCKED (Trade closed this hour). NO RE-ENTRY!";
+      dist_exec_str = StringFormat("⏳ NEXT CANDLE COUNTDOWN: %02d:%02d (DO NOT TRADE)", mm, ss);
+   }
+   else if(ExtTrendEngine.IsBodyBullValid())
    {
       double target_p = ExtTrendEngine.GetBodyEntryBull();
       double dist_to_target = bid - target_p;
@@ -154,10 +218,19 @@ void UpdateHUD()
                 ? StringFormat("ON (At +%.0f pts -> Lock +%.0f pts)", InpBETriggerPoints, InpBELockPoints)
                 : "OFF";
 
+   string lock_banner = "";
+   if(is_locked)
+   {
+      int mm = seconds_left / 60;
+      int ss = seconds_left % 60;
+      lock_banner = StringFormat("  >>> 🔒 HOUR LOCKED (SL/BE/TP HIT) | NEXT IN: %02d:%02d <<<\n", mm, ss);
+   }
+
    string hud =
       "===================================================\n"
       "  UmeaFX FX Vol 60 Master Engine v2.20             \n"
-      "  Mode 3: Body Retrace | Mode 2: Daily Fade        \n"
+      "  Mode 3: Body Retrace | Mode 2: Daily Fade        \n" +
+      lock_banner +
       "===================================================\n"
       "Execution Method: " + exec_mode_str + "\n" +
       "Daily Open:       " + DoubleToString(daily_open, 2) + "\n" +
@@ -186,9 +259,14 @@ void UpdateHUD()
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   UpdateHUD();
+   // 1. Check if Current H1 Candle is locked (SL, BE, or TP closed this hour)
+   int seconds_left = 0;
+   bool is_locked = IsCurrentH1Locked(seconds_left);
 
-   // 1. Real-time breakeven check on every tick
+   // Update HUD on every single tick
+   UpdateHUD(is_locked, seconds_left);
+
+   // Real-time breakeven check on every tick (for already open positions)
    ExtTradeManager.ManageBreakeven();
    ExtTradeManager.CheckDailyReset(TimeCurrent());
 
@@ -199,8 +277,10 @@ void OnTick()
    if(is_new_bar)
    {
       ExtLastBarH1       = h1_time;
-      ExtExecutedThisBar  = false;
-      ExtSLOrTPHitThisBar = false;   // New H1 candle — re-entry block lifted
+      ExtExecutedThisBar = false;
+
+      // Re-evaluate lock on new bar
+      is_locked = IsCurrentH1Locked(seconds_left);
 
       // Cancel any unfilled pending orders from previous bar
       ExtTradeManager.CancelPendingOrders();
@@ -215,7 +295,7 @@ void OnTick()
       }
 
       // If user is using Limit Orders (not market execution), place them at bar open
-      if(!InpUseMarketExecution && !ExtTradeManager.IsCircuitBreakerHit() && ExtTradeManager.TotalActive() == 0)
+      if(!is_locked && !InpUseMarketExecution && !ExtTradeManager.IsCircuitBreakerHit() && ExtTradeManager.TotalActive() == 0)
       {
          double bar_open = iOpen(_Symbol, PERIOD_H1, 0);
          ENUM_DAILY_ZONE z = ExtTrendEngine.GetZone(bar_open);
@@ -252,14 +332,21 @@ void OnTick()
       }
    }
 
+   // 🛑 ABSOLUTE RE-ENTRY GUARD: If current H1 candle is locked, CANCEL PENDINGS & RETURN IMMEDIATELY!
+   if(is_locked)
+   {
+      ExtTradeManager.CancelPendingOrders();
+      return;
+   }
+
    // 3. MARKET EXECUTION ON HIT (Monitors tick-by-tick)
    if(!InpUseMarketExecution)
       return;
 
-   // Block if: circuit breaker, already in a trade, already executed this bar, or SL/TP fired this bar
+   // Circuit breaker or trade already active / executed this bar -> Skip
    if(ExtTradeManager.IsCircuitBreakerHit())
       return;
-   if(ExtTradeManager.TotalActive() > 0 || ExtExecutedThisBar || ExtSLOrTPHitThisBar)
+   if(ExtTradeManager.TotalActive() > 0 || ExtExecutedThisBar)
       return;
 
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
@@ -336,13 +423,13 @@ void OnTick()
 }
 
 //+------------------------------------------------------------------+
-//| Trade Transaction Handler — detects SL/TP closes                |
+//| Trade Transaction Handler — detects SL/BE/TP position closes    |
 //+------------------------------------------------------------------+
 void OnTradeTransaction(const MqlTradeTransaction &trans,
                         const MqlTradeRequest     &request,
                         const MqlTradeResult      &result)
 {
-   // We only care about deal-add events (a trade actually executed)
+   // We only care about deal-add events (a trade deal actually executed)
    if(trans.type != TRADE_TRANSACTION_DEAL_ADD)
       return;
    if(trans.symbol != _Symbol)
@@ -357,22 +444,36 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,
       return;
 
    ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
-   if(entry_type != DEAL_ENTRY_OUT)   // Only closing deals
+   if(entry_type != DEAL_ENTRY_OUT)   // Only closing deals (SL, BE, TP, manual, etc.)
       return;
 
-   ENUM_DEAL_REASON reason = (ENUM_DEAL_REASON)HistoryDealGetInteger(trans.deal, DEAL_REASON);
+   // ANY closing deal in this H1 candle triggers the lock!
+   datetime current_h1 = iTime(_Symbol, PERIOD_H1, 0);
+   ExtLockedH1Bar = current_h1;
 
-   if(reason == DEAL_REASON_SL)
+   // Cancel any pending limit orders immediately
+   ExtTradeManager.CancelPendingOrders();
+
+   double profit = HistoryDealGetDouble(trans.deal, DEAL_PROFIT);
+   if(profit < 0.0)
    {
-      ExtSLOrTPHitThisBar = true;
-      ExtTradeManager.RegisterLoss();   // Fix: circuit breaker now actually counts losses
-      Print(">> SL triggered. Re-entry BLOCKED for remainder of this H1 candle. Daily losses: ",
-            ExtTradeManager.IsCircuitBreakerHit() ? "CIRCUIT BREAKER HIT" : "within limit");
+      ExtTradeManager.RegisterLoss();
    }
-   else if(reason == DEAL_REASON_TP)
-   {
-      ExtSLOrTPHitThisBar = true;
-      Print(">> TP triggered. Re-entry BLOCKED for remainder of this H1 candle.");
-   }
+
+   int seconds_left = (int)(current_h1 + 3600 - TimeCurrent());
+   if(seconds_left < 0) seconds_left = 0;
+   int mm = seconds_left / 60;
+   int ss = seconds_left % 60;
+
+   ENUM_DEAL_REASON reason = (ENUM_DEAL_REASON)HistoryDealGetInteger(trans.deal, DEAL_REASON);
+   string reason_str = "CLOSED";
+   if(reason == DEAL_REASON_SL) reason_str = "STOP LOSS";
+   else if(reason == DEAL_REASON_TP) reason_str = "TAKE PROFIT";
+   else if(profit > 0) reason_str = "BREAKEVEN/PROFIT";
+   else reason_str = "LOSS";
+
+   PrintFormat(">> 🛑 [H1 LOCK ENGAGED] Position closed via %s (Profit: %.2f). Next candle countdown: %02d:%02d",
+               reason_str, profit, mm, ss);
 }
 //+------------------------------------------------------------------+
+

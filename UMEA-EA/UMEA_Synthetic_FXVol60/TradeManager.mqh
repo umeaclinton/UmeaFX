@@ -160,8 +160,41 @@ public:
       }
    }
 
+   bool IsH1CandleLocked()
+   {
+      datetime current_h1 = iTime(m_symbol, PERIOD_H1, 0);
+      if(current_h1 <= 0)
+         return false;
+
+      datetime now = TimeCurrent();
+      if(HistorySelect(current_h1, now))
+      {
+         int total = HistoryDealsTotal();
+         for(int i = total - 1; i >= 0; i--)
+         {
+            ulong t = HistoryDealGetTicket(i);
+            if(t > 0)
+            {
+               if(HistoryDealGetInteger(t, DEAL_MAGIC) == (long)m_magic &&
+                  HistoryDealGetString(t, DEAL_SYMBOL) == m_symbol &&
+                  (ENUM_DEAL_ENTRY)HistoryDealGetInteger(t, DEAL_ENTRY) == DEAL_ENTRY_OUT)
+               {
+                  return true;
+               }
+            }
+         }
+      }
+      return false;
+   }
+
    bool PlaceBuyLimit(double entry_price, double stop_loss, double take_profit, string comment="FXVol60 BuyLimit")
    {
+      if(IsH1CandleLocked())
+      {
+         Print(">> 🛑 [TradeManager] Order REJECTED: A trade already closed in this H1 candle. Locked until next candle.");
+         return false;
+      }
+
       double volume = CalculateLotSize(entry_price, stop_loss);
       int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
 
@@ -174,6 +207,12 @@ public:
 
    bool PlaceSellLimit(double entry_price, double stop_loss, double take_profit, string comment="FXVol60 SellLimit")
    {
+      if(IsH1CandleLocked())
+      {
+         Print(">> 🛑 [TradeManager] Order REJECTED: A trade already closed in this H1 candle. Locked until next candle.");
+         return false;
+      }
+
       double volume = CalculateLotSize(entry_price, stop_loss);
       int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
 
@@ -186,6 +225,12 @@ public:
 
    bool BuyMarket(double stop_loss, double take_profit, string comment="FXVol60 BuyMarket")
    {
+      if(IsH1CandleLocked())
+      {
+         Print(">> 🛑 [TradeManager] Market BUY REJECTED: A trade already closed in this H1 candle. Locked until next candle.");
+         return false;
+      }
+
       double ask = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
       double volume = CalculateLotSize(ask, stop_loss);
       int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
@@ -198,6 +243,12 @@ public:
 
    bool SellMarket(double stop_loss, double take_profit, string comment="FXVol60 SellMarket")
    {
+      if(IsH1CandleLocked())
+      {
+         Print(">> 🛑 [TradeManager] Market SELL REJECTED: A trade already closed in this H1 candle. Locked until next candle.");
+         return false;
+      }
+
       double bid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
       double volume = CalculateLotSize(bid, stop_loss);
       int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
