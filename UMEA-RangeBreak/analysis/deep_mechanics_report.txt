@@ -1,0 +1,6 @@
+UMEA-RangeBreak 100 Index: Deep Mechanics Report
+==================================================
+Total Breaks Analyzed: 2,000
+Average Breakout Size: 192.0 pts
+Directional Prediction Accuracy (Strict Range Position): 67.30%
+Directional Prediction Accuracy (Position + Momentum Combo): 74.46%

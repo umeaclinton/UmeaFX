@@ -1,0 +1,10 @@
+UMEA-RangeBreak 100 Index: Spike Fade Strategy Report
+==================================================
+Total M1 Bars Tested: 100,125
+Total Buy Spikes Tested: 444 | Total Sell Spikes Tested: 473
+
+Spike High Integrity (15 min window): 84.01% respected
+Spike Low Integrity (15 min window):  80.13% respected
+
+Avg Retracement after Buy Spike:  30.30 pts
+Avg Retracement after Sell Spike: 28.60 pts

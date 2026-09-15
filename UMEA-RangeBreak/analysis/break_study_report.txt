@@ -1,0 +1,15 @@
+UMEA-RangeBreak 100 Index: Statistical Study Report
+Total M5 Bars: 100,000 | Date Span: 2025-10-03 12:30:00 to 2026-09-15 17:50:00
+Total Breakouts Identified: 2,000
+
+UP Breaks: 989 (49.45%)
+DOWN Breaks: 1,011 (50.55%)
+
+Mean Duration Between Breaks: 50.0 bars (249.8 mins)
+Median Duration: 35.0 bars
+Min Duration: 1 bars | Max Duration: 365 bars
+
+Transition UP -> UP: 51.67%
+Transition UP -> DOWN: 48.33%
+Transition DOWN -> UP: 47.23%
+Transition DOWN -> DOWN: 52.77%
