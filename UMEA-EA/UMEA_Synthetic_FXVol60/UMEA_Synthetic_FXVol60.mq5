@@ -48,8 +48,9 @@ input int      InpMaxDailyLosses       = 3;        // Max Daily Losses Before Pa
 //+------------------------------------------------------------------+
 CTrendEngine   ExtTrendEngine;
 CTradeManager  ExtTradeManager;
-datetime       ExtLastBarH1 = 0;
+datetime       ExtLastBarH1       = 0;
 bool           ExtExecutedThisBar = false;
+bool           ExtSLOrTPHitThisBar = false;  // Blocks re-entry after SL or TP fires this H1 bar
 
 //+------------------------------------------------------------------+
 //| Expert initialization                                            |
@@ -197,8 +198,9 @@ void OnTick()
 
    if(is_new_bar)
    {
-      ExtLastBarH1 = h1_time;
-      ExtExecutedThisBar = false;
+      ExtLastBarH1       = h1_time;
+      ExtExecutedThisBar  = false;
+      ExtSLOrTPHitThisBar = false;   // New H1 candle — re-entry block lifted
 
       // Cancel any unfilled pending orders from previous bar
       ExtTradeManager.CancelPendingOrders();
@@ -254,10 +256,10 @@ void OnTick()
    if(!InpUseMarketExecution)
       return;
 
-   // Circuit breaker or trade already active / executed this bar -> Skip
+   // Block if: circuit breaker, already in a trade, already executed this bar, or SL/TP fired this bar
    if(ExtTradeManager.IsCircuitBreakerHit())
       return;
-   if(ExtTradeManager.TotalActive() > 0 || ExtExecutedThisBar)
+   if(ExtTradeManager.TotalActive() > 0 || ExtExecutedThisBar || ExtSLOrTPHitThisBar)
       return;
 
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
@@ -330,6 +332,47 @@ void OnTick()
             }
          }
       }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Trade Transaction Handler — detects SL/TP closes                |
+//+------------------------------------------------------------------+
+void OnTradeTransaction(const MqlTradeTransaction &trans,
+                        const MqlTradeRequest     &request,
+                        const MqlTradeResult      &result)
+{
+   // We only care about deal-add events (a trade actually executed)
+   if(trans.type != TRADE_TRANSACTION_DEAL_ADD)
+      return;
+   if(trans.symbol != _Symbol)
+      return;
+
+   // Select the deal from history to inspect it
+   if(!HistoryDealSelect(trans.deal))
+      return;
+
+   long magic = HistoryDealGetInteger(trans.deal, DEAL_MAGIC);
+   if(magic != (long)InpMagicNumber)
+      return;
+
+   ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(trans.deal, DEAL_ENTRY);
+   if(entry_type != DEAL_ENTRY_OUT)   // Only closing deals
+      return;
+
+   ENUM_DEAL_REASON reason = (ENUM_DEAL_REASON)HistoryDealGetInteger(trans.deal, DEAL_REASON);
+
+   if(reason == DEAL_REASON_SL)
+   {
+      ExtSLOrTPHitThisBar = true;
+      ExtTradeManager.RegisterLoss();   // Fix: circuit breaker now actually counts losses
+      Print(">> SL triggered. Re-entry BLOCKED for remainder of this H1 candle. Daily losses: ",
+            ExtTradeManager.IsCircuitBreakerHit() ? "CIRCUIT BREAKER HIT" : "within limit");
+   }
+   else if(reason == DEAL_REASON_TP)
+   {
+      ExtSLOrTPHitThisBar = true;
+      Print(">> TP triggered. Re-entry BLOCKED for remainder of this H1 candle.");
    }
 }
 //+------------------------------------------------------------------+
