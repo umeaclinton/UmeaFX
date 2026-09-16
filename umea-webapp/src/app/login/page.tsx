@@ -47,10 +47,10 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showSignupPassword, setShowSignupPassword] = useState(false);
 
-  // OTP State
-  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  // OTP State (Flexibly supports 6 to 8 digit codes & copy-paste)
+  const [otpCode, setOtpCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(60);
-  const otpInputs = useRef<(HTMLInputElement | null)[]>([]);
+  const otpInputRef = useRef<HTMLInputElement>(null);
 
   // Resend Timer countdown
   useEffect(() => {
@@ -77,7 +77,6 @@ export default function LoginPage() {
       });
 
       if (error) {
-        // If email not found, offer sign up guidance
         if (error.message.toLowerCase().includes("invalid login credentials")) {
           throw new Error("Invalid email or password. If you haven't registered yet, please create an account.");
         }
@@ -143,9 +142,9 @@ export default function LoginPage() {
       // Switch to OTP view
       setMode("otp");
       setResendCooldown(60);
-      setSuccessMsg(`A 6-digit confirmation code was sent to ${signupEmail.trim()}`);
+      setSuccessMsg(`Verification code was sent to ${signupEmail.trim()}`);
       setTimeout(() => {
-        otpInputs.current[0]?.focus();
+        otpInputRef.current?.focus();
       }, 200);
     } catch (err: any) {
       setErrorMsg(err.message || "Sign up failed. Please check your inputs.");
@@ -154,35 +153,32 @@ export default function LoginPage() {
     }
   };
 
-  // Handle OTP digit input changes
-  const handleOtpChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-
-    const newOtp = [...otpDigits];
-    newOtp[index] = value.slice(-1);
-    setOtpDigits(newOtp);
-
-    // Auto-advance to next input cell
-    if (value && index < 5) {
-      otpInputs.current[index + 1]?.focus();
+  // Focus OTP input when switching to OTP view
+  useEffect(() => {
+    if (mode === "otp") {
+      setTimeout(() => {
+        otpInputRef.current?.focus();
+      }, 200);
     }
+  }, [mode]);
 
-    // Auto-submit when all 6 digits entered
-    const fullCode = newOtp.join("");
-    if (fullCode.length === 6) {
-      verifyOtpCode(fullCode);
-    }
-  };
+  // Handle OTP input change
+  const handleOtpInput = (val: string) => {
+    const cleaned = val.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
+    setOtpCode(cleaned);
 
-  // Handle Backspace navigation in OTP cells
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
-      otpInputs.current[index - 1]?.focus();
+    // Auto-verify if user entered/pasted full 8 digits
+    if (cleaned.length === 8) {
+      verifyOtpCode(cleaned);
     }
   };
 
-  // Verify 6-digit OTP code
+  // Verify OTP code (works for 6 or 8 digits)
   const verifyOtpCode = async (code: string) => {
+    if (!code || code.length < 6) {
+      setErrorMsg("Please enter the complete verification code from your email.");
+      return;
+    }
     setErrorMsg("");
     setSuccessMsg("");
     setIsLoading(true);
@@ -190,7 +186,7 @@ export default function LoginPage() {
     try {
       const { data, error } = await supabasePublic.auth.verifyOtp({
         email: signupEmail.trim(),
-        token: code,
+        token: code.trim(),
         type: "signup",
       });
 
@@ -639,32 +635,38 @@ export default function LoginPage() {
                 </form>
               )}
 
-              {/* ── MODE 3: 6-DIGIT OTP VERIFICATION ── */}
+              {/* ── MODE 3: 6 TO 8 DIGIT OTP VERIFICATION ── */}
               {mode === "otp" && (
                 <div className="space-y-6">
-                  {/* 6 Digit Input Grid */}
-                  <div className="flex items-center justify-center gap-2.5 sm:gap-3 my-4">
-                    {otpDigits.map((digit, idx) => (
+                  <div>
+                    <label className="block text-center text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2">
+                      Enter Verification Code
+                    </label>
+                    <div className="relative max-w-sm mx-auto">
                       <input
-                        key={idx}
-                        ref={(el) => {
-                          otpInputs.current[idx] = el;
-                        }}
+                        ref={otpInputRef}
                         type="text"
-                        inputMode="numeric"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => handleOtpChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-black font-mono rounded-xl bg-gray-50 dark:bg-[#111111] border-2 border-gray-200 dark:border-white/15 focus:border-emerald-500 text-gray-900 dark:text-white outline-none transition shadow-sm"
+                        maxLength={8}
+                        placeholder="••••••••"
+                        value={otpCode}
+                        onChange={(e) => handleOtpInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && otpCode.length >= 6) {
+                            verifyOtpCode(otpCode);
+                          }
+                        }}
+                        className="w-full py-3.5 px-4 text-center font-mono text-2xl sm:text-3xl font-black tracking-[0.4em] sm:tracking-[0.6em] rounded-2xl bg-gray-50 dark:bg-[#111111] border-2 border-gray-200 dark:border-white/15 focus:border-emerald-500 text-gray-900 dark:text-white outline-none transition shadow-inner uppercase"
                       />
-                    ))}
+                    </div>
+                    <p className="text-center text-[11px] text-gray-400 dark:text-slate-500 mt-2">
+                      Enter or paste the code delivered to your email.
+                    </p>
                   </div>
 
                   <button
                     type="button"
-                    disabled={isLoading || otpDigits.join("").length !== 6}
-                    onClick={() => verifyOtpCode(otpDigits.join(""))}
+                    disabled={isLoading || otpCode.trim().length < 6}
+                    onClick={() => verifyOtpCode(otpCode.trim())}
                     className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black text-sm transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
