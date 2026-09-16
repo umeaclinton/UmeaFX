@@ -13,6 +13,8 @@ import {
   Activity,
   Sliders,
   Cpu,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import { supabasePublic } from "@/lib/supabase";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -118,7 +120,7 @@ export default function HomePage() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span className="font-mono text-emerald-600 dark:text-emerald-400">FX Vol 60</span>
+          <span className="font-mono text-emerald-600 dark:text-emerald-400">Multi-Asset Synthetics</span>
           <span className="text-gray-300 dark:text-slate-600">•</span>
           <span>Continuous 24/7/365 Execution</span>
         </div>
@@ -132,7 +134,7 @@ export default function HomePage() {
         </h1>
 
         <p className="mt-6 text-base sm:text-xl text-gray-500 dark:text-slate-400 max-w-3xl leading-relaxed">
-          Link your Weltrade MT5 account in under 60 seconds. Our cloud-hosted quantitative algorithm executes proprietary volatility setups directly onto your account around the clock. Zero manual intervention required.
+          Link your broker MT5 account in under 60 seconds. Our cloud-hosted quantitative algorithms execute proprietary synthetic setups directly onto your account around the clock. Zero manual intervention required.
         </p>
 
         {/* CTAs */}
@@ -186,9 +188,9 @@ export default function HomePage() {
                       <Typewriter text="Layer 1 • Quantitative" speed={35} delay={200} />
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-subtle-pulse" />
                     </div>
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">FX Vol 60 Algorithm</h4>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Quantitative Models</h4>
                     <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
-                      Continuously scans the 24/7 synthetic stream on the H1 timeframe for directional volume displacement and trend continuation.
+                      Continuously scans continuous synthetic streams for directional volume displacement, range exhaustion, and momentum impulses.
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-gray-200 dark:border-white/8 flex items-center justify-between text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
@@ -226,7 +228,7 @@ export default function HomePage() {
                     </div>
                     <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Direct MT5 Execution</h4>
                     <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
-                      Trades are filled natively on your Weltrade MT5 account in under 15ms. Sized to your exact risk settings and account balance.
+                      Trades are filled natively on your broker MT5 account in under 15ms. Sized to your exact risk settings and account balance.
                     </p>
                   </div>
                   <div className="mt-4 pt-3 border-t border-gray-200 dark:border-white/8 flex items-center justify-between text-[11px] font-mono text-cyan-600 dark:text-cyan-400">
@@ -274,6 +276,171 @@ export default function HomePage() {
               <p className="text-sm text-gray-500 dark:text-slate-400 leading-relaxed">
                 All broker trade passwords are encrypted with military-grade AES-256-GCM authenticated encryption before being stored.
               </p>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ── Supported & Upcoming Instruments Section ── */}
+      <section className="px-4 sm:px-6 py-20 max-w-7xl mx-auto w-full border-t border-gray-200 dark:border-white/8">
+        <ScrollReveal direction="fade">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 mb-3">
+              <Layers className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Multi-Asset Capabilities</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
+              Supported & Upcoming Instruments
+            </h2>
+            <p className="mt-3 text-gray-500 dark:text-slate-400 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+              Our quantitative models are custom-built for high-liquidity synthetics and indices. Select and trade proven live engines, with more specialized models unlocking soon.
+            </p>
+          </div>
+        </ScrollReveal>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+          {/* Card 1: FX Vol 60 - LIVE */}
+          <ScrollReveal direction="up" delay={0}>
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#0c0c0c] border-2 border-emerald-500/50 shadow-xl shadow-emerald-500/5 relative flex flex-col justify-between h-full glass-card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-mono font-black text-sm">
+                  60
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  LIVE & ACTIVE
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1.5">FX Vol 60 Index</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mb-4">
+                  Directional body retracement and extreme daily boundary fade engine. Operates 24/7/365 with automated profit locking and daily circuit breakers.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-white/8 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-gray-400 dark:text-slate-400">Weltrade Synthetic</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">1:2 R:R Ratio</span>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Card 2: Range Break 100 - COMING SOON */}
+          <ScrollReveal direction="up" delay={100}>
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-white/8 relative flex flex-col justify-between h-full opacity-90 hover:opacity-100 transition glass-card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400 font-mono font-black text-sm">
+                  RB
+                </div>
+                <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-white/10">
+                  COMING SOON
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1.5">Range Break 100 Index</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mb-4">
+                  Cooled-down spike exhaustion sniper. Fades explosive breakout tops and captures boundary ping-pong retests with strict time-based exit guards.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-white/8 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-gray-400 dark:text-slate-400">Deriv Synthetics</span>
+                <span className="text-teal-600 dark:text-teal-400 font-bold">Sniper Scalp</span>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Card 3: Range Break 200 - COMING SOON */}
+          <ScrollReveal direction="up" delay={200}>
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-white/8 relative flex flex-col justify-between h-full opacity-90 hover:opacity-100 transition glass-card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400 font-mono font-black text-sm">
+                  200
+                </div>
+                <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-white/10">
+                  COMING SOON
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1.5">Range Break 200 Index</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mb-4">
+                  Extended range capacity impulse model. Captures higher-magnitude retracements across multi-candle consolidation regimes.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-white/8 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-gray-400 dark:text-slate-400">Deriv Synthetics</span>
+                <span className="text-cyan-600 dark:text-cyan-400 font-bold">Cycle Impulse</span>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Card 4: Boom & Crash Indices */}
+          <ScrollReveal direction="up" delay={100}>
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-white/8 relative flex flex-col justify-between h-full opacity-70 hover:opacity-90 transition glass-card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 font-mono font-black text-sm">
+                  BC
+                </div>
+                <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-white/10">
+                  IN RESEARCH
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1.5">Boom & Crash Indices</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mb-4">
+                  Tick-volume accumulation models engineered for asymmetric spike frequency anticipation and risk-defined micro-momentum entries.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-white/8 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-gray-400 dark:text-slate-400">Asymmetric Spikes</span>
+                <span className="text-amber-600 dark:text-amber-400 font-bold">Planned 2026</span>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Card 5: Volatility 75 & 100 */}
+          <ScrollReveal direction="up" delay={200}>
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-gray-200 dark:border-white/8 relative flex flex-col justify-between h-full opacity-70 hover:opacity-90 transition glass-card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 font-mono font-black text-sm">
+                  V75
+                </div>
+                <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-white/10">
+                  IN RESEARCH
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1.5">Volatility 75 & 100</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mb-4">
+                  High-speed constant-volatility stream algorithms utilizing statistical volatility bands and multi-timeframe mean-reversion channels.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-white/8 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-gray-400 dark:text-slate-400">High Volatility</span>
+                <span className="text-purple-600 dark:text-purple-400 font-bold">Planned 2026</span>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          {/* Card 6: Multi-Model Ecosystem */}
+          <ScrollReveal direction="up" delay={300}>
+            <div className="p-6 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-dashed border-gray-300 dark:border-white/15 relative flex flex-col justify-between h-full glass-card-hover">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                  R&D PIPELINE
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1.5">Expanding Portfolio</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed mb-4">
+                  Our quant laboratory continually backtests new algorithms across emerging synthetic indices. As models complete live verification, they unlock directly in your dashboard.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-gray-100 dark:border-white/8 flex items-center justify-between text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span>Multi-Asset Execution</span>
+                <span>Active Development</span>
+              </div>
             </div>
           </ScrollReveal>
         </div>
@@ -397,7 +564,7 @@ export default function HomePage() {
                 </p>
                 <ul className="space-y-3.5 mb-8 text-xs sm:text-sm text-gray-700 dark:text-slate-300">
                   {[
-                    "Full access to FX Vol 60 Autonomous System",
+                    "Full access to Autonomous Synthetic Suite",
                     "Automated Breakeven & Stop Loss Sync",
                     "Sub-15ms cloud execution pipeline",
                     "No VPS required. 100% hands-free",
@@ -432,7 +599,7 @@ export default function HomePage() {
                 </p>
                 <ul className="space-y-3.5 mb-8 text-xs sm:text-sm text-gray-700 dark:text-slate-300">
                   {[
-                    "Full access to FX Vol 60 Autonomous System",
+                    "Full access to Autonomous Synthetic Suite",
                     "Customizable risk multiplier & safety caps",
                     "Priority execution bandwidth",
                     "Pay via Card, Bank Transfer, or Crypto",

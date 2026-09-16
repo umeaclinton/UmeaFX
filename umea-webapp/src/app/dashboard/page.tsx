@@ -15,10 +15,12 @@ import {
   Check,
   Activity,
   ArrowUpRight,
+  Layers,
 } from "lucide-react";
 import { supabasePublic } from "@/lib/supabase";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Typewriter } from "@/components/Typewriter";
+import { InfoTooltip } from "@/components/InfoTooltip";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -30,6 +32,7 @@ export default function DashboardPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [server, setServer] = useState("Weltrade-Real");
+  const [selectedInstrument, setSelectedInstrument] = useState("fx_vol_60");
   const [riskMode, setRiskMode] = useState<"multiplier" | "fixed">("multiplier");
   const [riskValue, setRiskValue] = useState("1.0");
   const [maxLot, setMaxLot] = useState("2.0");
@@ -344,8 +347,84 @@ export default function DashboardPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Target Trading Instrument */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Target Trading Instrument</span>
+                  </div>
+                  <InfoTooltip
+                    title="Target Instrument"
+                    content="Select the synthetic asset you want the algorithm to trade on this MT5 account. Currently, FX Vol 60 is live and fully synced. Additional instruments will unlock as each quantitative engine is enabled."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* FX Vol 60 - Active */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInstrument("fx_vol_60")}
+                    className={`relative p-3.5 rounded-xl text-left transition-all border ${
+                      selectedInstrument === "fx_vol_60"
+                        ? "bg-emerald-500/10 border-emerald-500 text-gray-900 dark:text-white shadow-sm ring-1 ring-emerald-500/30"
+                        : "bg-gray-50 dark:bg-[#111111] border-gray-200 dark:border-white/10 text-gray-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black tracking-tight">FX Vol 60 Index</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        Live
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-snug">
+                      Autonomous synthetic volatility engine. Active 24/7.
+                    </p>
+                  </button>
+
+                  {/* Range Break 100 - Disabled */}
+                  <div className="relative p-3.5 rounded-xl text-left border bg-gray-100/60 dark:bg-white/[0.02] border-gray-200/60 dark:border-white/5 opacity-60 cursor-not-allowed">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-gray-500 dark:text-slate-400 tracking-tight">Range Break 100</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-slate-400 border border-gray-300 dark:border-white/10">
+                        Unavailable
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 dark:text-slate-400 leading-snug">
+                      Range-break algorithm pending multi-broker sync rollout.
+                    </p>
+                  </div>
+
+                  {/* Range Break 200 - Disabled */}
+                  <div className="relative p-3.5 rounded-xl text-left border bg-gray-100/60 dark:bg-white/[0.02] border-gray-200/60 dark:border-white/5 opacity-60 cursor-not-allowed">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-gray-500 dark:text-slate-400 tracking-tight">Range Break 200</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-slate-400 border border-gray-300 dark:border-white/10">
+                        Unavailable
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 dark:text-slate-400 leading-snug">
+                      Higher volatility range break engine in internal testing.
+                    </p>
+                  </div>
+
+                  {/* Boom & Crash 1000 - Disabled */}
+                  <div className="relative p-3.5 rounded-xl text-left border bg-gray-100/60 dark:bg-white/[0.02] border-gray-200/60 dark:border-white/5 opacity-60 cursor-not-allowed">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-black text-gray-500 dark:text-slate-400 tracking-tight">Boom & Crash 1000</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-slate-400 border border-gray-300 dark:border-white/10">
+                        Unavailable
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400 dark:text-slate-400 leading-snug">
+                      Tick spike detector in quantitative research phase.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Account Credentials */}
-              <div className="space-y-4">
+              <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-white/8">
                 <div className="text-xs font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-emerald-500" />
                   <span>Account Credentials</span>
@@ -373,7 +452,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Broker Server Name</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-slate-300">Broker Server Name</label>
+                    <InfoTooltip
+                      title="Broker Server"
+                      content="Select the exact MT5 server name provided by your broker in your account registration email (e.g. Weltrade-Real or Weltrade-Demo)."
+                    />
+                  </div>
                   <select value={server} onChange={(e) => setServer(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono dark:[color-scheme:dark]">
                     <option value="Weltrade-Real">Weltrade-Real</option>
@@ -391,7 +476,13 @@ export default function DashboardPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Risk Calculation Mode</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-gray-600 dark:text-slate-300">Risk Calculation Mode</label>
+                      <InfoTooltip
+                        title="Risk Calculation Mode"
+                        content="Multiplier scales your trade lot size relative to the master account (e.g., 1.0x copies exact master volume, 0.5x copies half volume). Fixed Lot enforces an exact unvarying volume on every single trade regardless of master size."
+                      />
+                    </div>
                     <select value={riskMode} onChange={(e) => setRiskMode(e.target.value as any)}
                       className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition dark:[color-scheme:dark]">
                       <option value="multiplier">Risk Multiplier (e.g. 1.0x master lot)</option>
@@ -399,9 +490,19 @@ export default function DashboardPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">
-                      {riskMode === "multiplier" ? "Multiplier Value (1.0 = Match Master)" : "Fixed Lot Value"}
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-semibold text-gray-600 dark:text-slate-300">
+                        {riskMode === "multiplier" ? "Multiplier Value (1.0 = Match Master)" : "Fixed Lot Value"}
+                      </label>
+                      <InfoTooltip
+                        title={riskMode === "multiplier" ? "Position Multiplier" : "Fixed Lot Sizing"}
+                        content={
+                          riskMode === "multiplier"
+                            ? "A value of 1.0 matches the master trade volume 1:1. Set to 0.5 for conservative 50% risk, or 1.5 to 2.0 for higher capital allocation. Always balance this against your account margin."
+                            : "Specific lot size executed on your account regardless of master trade size. For example, 0.02 lots per trade."
+                        }
+                      />
+                    </div>
                     <input type="number" step="0.01" required value={riskValue}
                       onChange={(e) => setRiskValue(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono placeholder:text-gray-400 dark:placeholder:text-slate-600"
@@ -409,7 +510,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">Safety Max Lot Cap</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-slate-300">Safety Max Lot Cap</label>
+                    <InfoTooltip
+                      title="Safety Max Lot Cap"
+                      content="A strict protective barrier for your balance. No trade order will ever exceed this lot volume under any circumstance, preventing accidental over-leveraging during extreme balance swings."
+                    />
+                  </div>
                   <input type="number" step="0.01" required value={maxLot}
                     onChange={(e) => setMaxLot(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono dark:[color-scheme:dark]"

@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "UmeaFX | Autonomous Quantitative Trading for Synthetics",
-  description: "24/7/365 Autonomous FX Vol 60 Quantitative Algorithmic Execution System by UmeaFX",
+  description: "24/7/365 Autonomous Quantitative Algorithmic Execution System for Synthetics by UmeaFX",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",
