@@ -1,0 +1,48 @@
+{
+  "name": "UmeaFX - Autonomous Trading Portal",
+  "short_name": "UmeaFX",
+  "description": "Institutional 24/7/365 Autonomous Quantitative Execution System for Synthetics by UmeaFX",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["finance", "business", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open live quantitative trading dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Portal Sign In",
+      "short_name": "Sign In",
+      "description": "Sign into your UmeaFX account",
+      "url": "/login",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}
