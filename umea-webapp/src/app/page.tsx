@@ -121,19 +121,8 @@ export default function HomePage() {
       {/* ── Hero ── */}
       <section className="relative px-4 sm:px-6 pt-16 pb-20 lg:pt-24 lg:pb-28 max-w-7xl mx-auto flex flex-col items-center text-center">
 
-        {/* Status Pill — floats gently */}
-        <div className="animate-float inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs font-semibold mb-8 text-gray-600 dark:text-slate-300 shadow-inner">
-          <span className="flex h-2 w-2 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="font-mono text-emerald-600 dark:text-emerald-400">Multi-Asset Synthetics</span>
-          <span className="text-gray-300 dark:text-slate-600">•</span>
-          <span>Continuous 24/7/365 Execution</span>
-        </div>
-
         {/* Headline */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-gray-900 dark:text-white max-w-5xl leading-[1.08]">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-gray-900 dark:text-white max-w-4xl leading-[1.15]">
           Institutional Algorithmic Trading.{" "}
           <span className="bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 bg-clip-text text-transparent">
             Automated Directly to Your MT5.
