@@ -120,3 +120,9 @@ html.dark .glass-card {
 html.dark ::-webkit-scrollbar-track { background: #0a0a0a; }
 html.dark ::-webkit-scrollbar-thumb { background: #1e1e1e; }
 html.dark ::-webkit-scrollbar-thumb:hover { background: #2a2a2a; }
+
+/* ─── PWA Toast 5s progress bar ─── */
+@keyframes toast-progress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
