@@ -40,6 +40,16 @@ export async function GET(req: NextRequest) {
       if (u.trial_ends_at) {
         const trialEnd = new Date(u.trial_ends_at);
         isActive = trialEnd > now && u.plan_status === "active";
+        if (trialEnd <= now && (u.status !== "disconnected" || u.mt5_login !== null)) {
+          // Auto-disconnect expired trial account in Supabase
+          await supabaseAdmin.from("users").update({
+            status: "disconnected",
+            mt5_login: null,
+            mt5_password_encrypted: null,
+            plan_status: "expired",
+            updated_at: new Date().toISOString(),
+          }).eq("id", u.id);
+        }
       } else {
         isActive = true;
       }

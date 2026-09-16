@@ -22,6 +22,10 @@ import {
   FileCheck,
   X,
   CheckCircle2,
+  Clock,
+  AlertTriangle,
+  CreditCard,
+  Zap,
 } from "lucide-react";
 import { supabasePublic } from "@/lib/supabase";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -47,6 +51,11 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // 3-Day Trial Countdown & Expiry State
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  const [isTrialExpired, setIsTrialExpired] = useState(false);
 
   // Profile & Settings State
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -114,25 +123,92 @@ export default function DashboardPage() {
 
       setEmail(activeEmail);
       setName(activeName || activeEmail.split("@")[0] || "Trader");
-      const storedPlan = (localStorage.getItem("umea_selected_plan") as any) || "ib_free_trial";
-      setPlan(storedPlan);
 
       try {
-        const res = await fetch(`/api/clients?key=umea-fx60-secret-bridge-key`);
-        const data = await res.json();
-        const found = data.clients?.find((c: any) => c.email.toLowerCase() === activeEmail!.toLowerCase());
-        if (found) {
-          setLogin(found.login.toString());
-          setServer(found.server);
-          setRiskMode(found.riskMode || "multiplier");
-          setRiskValue(found.riskValue.toString());
-          setMaxLot(found.maxLot.toString());
-          setIsSaved(true);
+        const statusRes = await fetch(`/api/user-status?email=${encodeURIComponent(activeEmail)}`);
+        const statusData = await statusRes.json();
+        if (statusData.success && statusData.user) {
+          const u = statusData.user;
+          if (u.plan) setPlan(u.plan);
+          if (u.trial_ends_at) setTrialEndsAt(u.trial_ends_at);
+          if (u.isTrialExpired) {
+            setIsTrialExpired(true);
+            setIsSaved(false);
+            setLogin("");
+          } else if (u.mt5_login) {
+            setLogin(u.mt5_login.toString());
+            setServer(u.mt5_server || "Weltrade-Real");
+            setRiskMode(u.risk_mode || "multiplier");
+            setRiskValue(u.risk_value?.toString() || "1.0");
+            setMaxLot(u.max_lot?.toString() || "2.0");
+            setIsSaved(true);
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.error("Failed to load user status:", err);
+      }
     }
     initUser();
   }, [router]);
+
+  // 1-second interval ticker for live 3-Day trial countdown
+  useEffect(() => {
+    if (plan !== "ib_free_trial" || !trialEndsAt) return;
+
+    const tickCountdown = () => {
+      const diff = new Date(trialEndsAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        if (!isTrialExpired) {
+          setIsTrialExpired(true);
+          setIsSaved(false);
+          setLogin("");
+          if (email) {
+            fetch(`/api/user-status?email=${encodeURIComponent(email)}`).catch(() => {});
+          }
+        }
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / 1000 / 60) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+
+    tickCountdown();
+    const interval = setInterval(tickCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [plan, trialEndsAt, email, isTrialExpired]);
+
+  const handleUpgradePaystack = async () => {
+    try {
+      const res = await fetch("/api/paystack/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 75000 }),
+      });
+      const data = await res.json();
+      if (data.success && data.authorizationUrl) window.location.href = data.authorizationUrl;
+    } catch (e) {
+      console.error("Paystack upgrade error:", e);
+    }
+  };
+
+  const handleUpgradeCrypto = async () => {
+    try {
+      const res = await fetch("/api/crypto/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 49.0 }),
+      });
+      const data = await res.json();
+      if (data.success && data.invoiceUrl) window.location.href = data.invoiceUrl;
+    } catch (e) {
+      console.error("Crypto upgrade error:", e);
+    }
+  };
 
   const handleLogout = async () => {
     await supabasePublic.auth.signOut();
@@ -298,15 +374,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             </button>
-
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="p-2.5 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-400 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </header>
@@ -317,6 +384,123 @@ export default function DashboardPage() {
 
       {/* ── Main ── */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 w-full flex-1">
+
+        {/* ── 3-Day Trial Countdown & Expiry Banner ── */}
+        {plan === "ib_free_trial" && (
+          <ScrollReveal direction="up" delay={0}>
+            {!isTrialExpired ? (
+              <div className="mb-8 p-6 sm:p-7 rounded-3xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 dark:border-emerald-500/30 backdrop-blur-xl relative overflow-hidden shadow-lg shadow-emerald-500/5 transition-all">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
+                      <span className="text-[11px] font-mono font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        3-Day Weltrade Free Trial
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        ACTIVE
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-emerald-500" />
+                      <span>Trial Time Remaining</span>
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
+                      Autonomous execution is live on Weltrade. When your 3-day trial period finishes, connected accounts will automatically disconnect. Upgrade anytime to maintain continuous, uninterrupted sync.
+                    </p>
+                  </div>
+
+                  {/* Digital Countdown Timer */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-2.5">
+                      <div className="flex flex-col items-center justify-center bg-white/90 dark:bg-black/60 border border-emerald-500/20 dark:border-white/10 rounded-2xl w-14 sm:w-16 h-16 shadow-sm">
+                        <span className="text-xl sm:text-2xl font-black font-mono text-gray-900 dark:text-white">
+                          {String(timeLeft?.days ?? 0).padStart(2, "0")}
+                        </span>
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-gray-400 dark:text-slate-400 font-semibold">Days</span>
+                      </div>
+                      <span className="text-xl font-black font-mono text-emerald-500">:</span>
+                      <div className="flex flex-col items-center justify-center bg-white/90 dark:bg-black/60 border border-emerald-500/20 dark:border-white/10 rounded-2xl w-14 sm:w-16 h-16 shadow-sm">
+                        <span className="text-xl sm:text-2xl font-black font-mono text-gray-900 dark:text-white">
+                          {String(timeLeft?.hours ?? 0).padStart(2, "0")}
+                        </span>
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-gray-400 dark:text-slate-400 font-semibold">Hours</span>
+                      </div>
+                      <span className="text-xl font-black font-mono text-emerald-500">:</span>
+                      <div className="flex flex-col items-center justify-center bg-white/90 dark:bg-black/60 border border-emerald-500/20 dark:border-white/10 rounded-2xl w-14 sm:w-16 h-16 shadow-sm">
+                        <span className="text-xl sm:text-2xl font-black font-mono text-gray-900 dark:text-white">
+                          {String(timeLeft?.minutes ?? 0).padStart(2, "0")}
+                        </span>
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-gray-400 dark:text-slate-400 font-semibold">Mins</span>
+                      </div>
+                      <span className="text-xl font-black font-mono text-emerald-500">:</span>
+                      <div className="flex flex-col items-center justify-center bg-white/90 dark:bg-black/60 border border-emerald-500/20 dark:border-white/10 rounded-2xl w-14 sm:w-16 h-16 shadow-sm">
+                        <span className="text-xl sm:text-2xl font-black font-mono text-emerald-500 animate-pulse">
+                          {String(timeLeft?.seconds ?? 0).padStart(2, "0")}
+                        </span>
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-gray-400 dark:text-slate-400 font-semibold">Secs</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleUpgradePaystack}
+                      className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-black tracking-wide uppercase transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <span>Upgrade $49/mo</span>
+                      <ArrowUpRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-8 p-6 sm:p-7 rounded-3xl bg-red-50 dark:bg-red-950/20 border-2 border-red-500/40 backdrop-blur-xl relative overflow-hidden shadow-xl shadow-red-500/10">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0 mt-0.5">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[11px] font-mono font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+                          Trial Expired
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30">
+                          ACCOUNT DISCONNECTED
+                        </span>
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white tracking-tight">
+                        Your 3-Day Free Trial Has Ended
+                      </h3>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 mt-1 max-w-xl leading-relaxed">
+                        Your connected MT5 account has been automatically disconnected and autonomous trade copying is paused. Upgrade to Direct Membership ($49/mo) to link your account back and restore 24/7 cloud sync.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+                    <button
+                      onClick={handleUpgradePaystack}
+                      className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-black tracking-wide uppercase transition shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>Upgrade with Paystack</span>
+                    </button>
+                    <button
+                      onClick={handleUpgradeCrypto}
+                      className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-black tracking-wide uppercase transition shadow-lg shadow-teal-600/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <Zap className="w-4 h-4" />
+                      <span>Upgrade with Crypto</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollReveal>
+        )}
 
         {/* ── Status Hub Cards ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
@@ -330,21 +514,25 @@ export default function DashboardPage() {
                 </span>
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-600 dark:text-slate-300">
                   <Activity className="w-3 h-3 text-emerald-500" />
-                  <Typewriter text="&lt;15ms" speed={80} delay={300} className="font-bold" />
+                  <Typewriter text="<15ms" speed={80} delay={300} className="font-bold" />
                 </div>
               </div>
               <div>
                 <div className="flex items-center gap-2.5">
                   <span className="relative flex h-3 w-3">
-                    {isSaved && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-                    <span className={`relative inline-flex rounded-full h-3 w-3 ${isSaved ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+                    {isSaved && !isTrialExpired && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                    <span className={`relative inline-flex rounded-full h-3 w-3 ${
+                      isTrialExpired ? "bg-red-500 animate-pulse" : isSaved ? "bg-emerald-500" : "bg-amber-500"
+                    }`}></span>
                   </span>
                   <span className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
-                    {isSaved ? "ACTIVE & SYNCED" : "SETUP REQUIRED"}
+                    {isTrialExpired ? "PAUSED (TRIAL EXPIRED)" : isSaved ? "ACTIVE & SYNCED" : "SETUP REQUIRED"}
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
-                  {isSaved
+                  {isTrialExpired
+                    ? "Your 3-day free trial has expired. MT5 terminal disconnected. Upgrade to Direct Membership to resume 24/7 execution."
+                    : isSaved
                     ? "Connected to cloud quantitative engine. Trades trigger automatically 24/7."
                     : "Link your Weltrade MT5 login and password below to activate execution."}
                 </p>
@@ -369,10 +557,12 @@ export default function DashboardPage() {
               </div>
               <div>
                 <div className="text-xl font-black tracking-tight text-gray-900 dark:text-white font-mono">
-                  {login ? `${login.slice(0, 4)}••••` : "Not Linked"}
+                  {isTrialExpired ? "Disconnected" : login ? `${login.slice(0, 4)}••••` : "Not Linked"}
                 </div>
                 <p className="mt-2 text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
-                  {login
+                  {isTrialExpired
+                    ? "Account unlinked automatically upon trial expiration. Upgrade to reconnect."
+                    : login
                     ? `Risk Mode: ${riskMode === "multiplier" ? `${riskValue}x Multiplier` : `${riskValue} Lots (Fixed)`} | Max Cap: ${maxLot}L`
                     : "No account credentials currently saved."}
                 </p>
@@ -394,46 +584,32 @@ export default function DashboardPage() {
                 <span className="text-[11px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider">
                   Access Tier
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                  ACTIVE
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                  isTrialExpired
+                    ? "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20"
+                    : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20"
+                }`}>
+                  {isTrialExpired ? "EXPIRED" : "ACTIVE"}
                 </span>
               </div>
               <div>
                 <div className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
-                  {plan === "ib_free_trial" ? "7-Day Partner Pass" : "Direct Membership"}
+                  {plan === "ib_free_trial" ? "3-Day Partner Pass" : "Direct Membership"}
                 </div>
                 <p className="mt-2 text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
                   {plan === "ib_free_trial"
-                    ? "7-Day Free Partner Access under Weltrade Partner ID."
+                    ? "3-Day Free Partner Access under Weltrade Partner ID."
                     : "$49/month unlimited autonomous trading subscription."}
                 </p>
               </div>
               {plan === "ib_free_trial" && (
                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-white/8 flex gap-2">
                   <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/paystack/initialize", {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 75000 }),
-                        });
-                        const data = await res.json();
-                        if (data.success && data.authorizationUrl) window.location.href = data.authorizationUrl;
-                      } catch (e) { console.error(e); }
-                    }}
+                    onClick={handleUpgradePaystack}
                     className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 text-[11px] font-bold font-mono transition text-center"
                   >💳 Paystack</button>
                   <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/crypto/initialize", {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ email, name, plan: "monthly_sub", amount: 49.0 }),
-                        });
-                        const data = await res.json();
-                        if (data.success && data.invoiceUrl) window.location.href = data.invoiceUrl;
-                      } catch (e) { console.error(e); }
-                    }}
+                    onClick={handleUpgradeCrypto}
                     className="flex-1 py-1.5 px-2 rounded-xl bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-500/30 text-[11px] font-bold font-mono transition text-center"
                   >⚡ Crypto</button>
                 </div>
@@ -453,7 +629,7 @@ export default function DashboardPage() {
                 <div>
                   <h4 className="text-sm font-bold text-gray-900 dark:text-white tracking-tight">Weltrade Partner Verification</h4>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 leading-relaxed">
-                    To maintain free 7-day partner access, your MT5 account must be registered with Weltrade Partner Code:
+                    To maintain free 3-day partner access, your MT5 account must be registered with Weltrade Partner Code:
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <span className="px-3 py-1 rounded-lg bg-white dark:bg-black border border-gray-200 dark:border-white/10 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-xs tracking-wider">
@@ -499,6 +675,22 @@ export default function DashboardPage() {
                   : "bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300"
               }`}>
                 <span>{message}</span>
+              </div>
+            )}
+
+            {isTrialExpired && (
+              <div className="p-4 rounded-2xl text-xs font-semibold mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300">
+                <div className="flex items-center gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                  <span>3-Day Free Trial Expired. Account linking is locked until upgraded to Direct Membership ($49/mo).</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUpgradePaystack}
+                  className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold shrink-0 transition self-start sm:self-auto"
+                >
+                  Upgrade Now
+                </button>
               </div>
             )}
 
@@ -589,16 +781,18 @@ export default function DashboardPage() {
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">MT5 Account Login ID</label>
                     <input type="number" required placeholder="e.g. 43241092" value={login}
+                      disabled={isTrialExpired}
                       onChange={(e) => setLogin(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono placeholder:text-gray-400 dark:placeholder:text-slate-600"
+                      className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono placeholder:text-gray-400 dark:placeholder:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2">MT5 Trade Password</label>
                     <div className="relative">
                       <input type={showPassword ? "text" : "password"} required placeholder="••••••••••••" value={password}
+                        disabled={isTrialExpired}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono pr-10 placeholder:text-gray-400 dark:placeholder:text-slate-600"
+                        className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-[#111111] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm focus:border-emerald-500 outline-none transition font-mono pr-10 placeholder:text-gray-400 dark:placeholder:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <button type="button" onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition">
@@ -683,10 +877,31 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <button type="submit" disabled={isLoading}
-                className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black text-sm transition-all shadow-xl shadow-emerald-500/25 disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99] mt-6">
-                {isLoading ? "Encrypting & Syncing..." : isSaved ? "Update Account Configuration" : "Save & Activate System Sync"}
-              </button>
+              {isTrialExpired ? (
+                <div className="space-y-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={handleUpgradePaystack}
+                    className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:brightness-110 text-white font-black text-sm transition-all shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Upgrade with Paystack ($49/mo) to Link Account</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpgradeCrypto}
+                    className="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-all shadow-lg shadow-teal-600/25 flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>Upgrade with Crypto ($49 USDT) to Link Account</span>
+                  </button>
+                </div>
+              ) : (
+                <button type="submit" disabled={isLoading}
+                  className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black text-sm transition-all shadow-xl shadow-emerald-500/25 disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99] mt-6">
+                  {isLoading ? "Encrypting & Syncing..." : isSaved ? "Update Account Configuration" : "Save & Activate System Sync"}
+                </button>
+              )}
             </form>
           </div>
         </ScrollReveal>
@@ -743,7 +958,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-sm text-gray-900 dark:text-white truncate">{name}</h3>
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
-                    {plan === "ib_free_trial" ? "7-DAY TRIAL" : "INSTITUTIONAL"}
+                    {plan === "ib_free_trial" ? "3-DAY TRIAL" : "INSTITUTIONAL"}
                   </span>
                 </div>
                 <div className="text-xs font-mono text-gray-400 dark:text-slate-400 truncate">

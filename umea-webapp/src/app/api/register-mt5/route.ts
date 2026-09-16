@@ -11,6 +11,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Check if user is on free trial and expired
+    const { data: existingUser } = await supabaseAdmin
+      .from("users")
+      .select("*")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+
+    if (existingUser && existingUser.plan === "ib_free_trial" && existingUser.trial_ends_at) {
+      if (new Date(existingUser.trial_ends_at).getTime() <= Date.now()) {
+        return NextResponse.json({
+          error: "Your 3-Day Free Trial has expired. Please upgrade to Direct Membership ($49/mo) to link an account.",
+        }, { status: 403 });
+      }
+    }
+
     const encryptedPwd = encryptPassword(password);
     const userId = `USR-${Buffer.from(email).toString("hex").substring(0, 10).toUpperCase()}`;
 

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
     if (plan === "ib_free_trial") {
       const d = new Date();
-      d.setDate(d.getDate() + 7);
+      d.setDate(d.getDate() + 3);
       trialEndsAt = d.toISOString();
     }
 

@@ -150,7 +150,7 @@ export default function HomePage() {
             onClick={() => { setSelectedPlan("ib_free_trial"); setIsModalOpen(true); }}
             className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 text-white font-black text-sm sm:text-base hover:brightness-110 shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2.5 hover:scale-[1.02] active:scale-[0.98]"
           >
-            <span>Start 7-Day Partner Access</span>
+            <span>Start 3-Day Partner Access</span>
             <ArrowRight className="w-4 h-4" />
           </button>
           <button
@@ -549,7 +549,7 @@ export default function HomePage() {
             Select Your Access Tier
           </h2>
           <p className="mt-3 text-gray-500 dark:text-slate-400 max-w-xl mx-auto text-sm sm:text-base">
-            Start 100% free for 7 days via our partner network, or subscribe directly. Cancel anytime.
+            Start 100% free for 3 days via our partner network, or subscribe directly. Cancel anytime.
           </p>
         </ScrollReveal>
 
@@ -564,10 +564,10 @@ export default function HomePage() {
                   Partner Tier
                 </div>
                 <div className="text-4xl font-black text-gray-900 dark:text-white mb-1">
-                  FREE <span className="text-base text-gray-400 font-normal">/ 7 Days</span>
+                  FREE <span className="text-base text-gray-400 font-normal">/ 3 Days</span>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mb-6">
-                  Open an account under our Weltrade Partner ID and receive 7 days of full autonomous execution at zero cost.
+                  Open an account under our Weltrade Partner ID and receive 3 days of full autonomous execution at zero cost.
                 </p>
                 <ul className="space-y-3.5 mb-8 text-xs sm:text-sm text-gray-700 dark:text-slate-300">
                   {[
@@ -587,7 +587,7 @@ export default function HomePage() {
                 onClick={() => { setSelectedPlan("ib_free_trial"); setIsModalOpen(true); }}
                 className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-black text-sm transition-all shadow-lg shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99]"
               >
-                Activate 7-Day Partner Pass
+                Activate 3-Day Partner Pass
               </button>
             </div>
           </ScrollReveal>
@@ -646,7 +646,7 @@ export default function HomePage() {
               <p className="text-xs text-gray-400 dark:text-slate-400 mt-1">
                 Selected:{" "}
                 <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase font-mono">
-                  {selectedPlan === "ib_free_trial" ? "7-Day Partner Pass" : "Direct Membership ($49)"}
+                  {selectedPlan === "ib_free_trial" ? "3-Day Partner Pass" : "Direct Membership ($49)"}
                 </span>
               </p>
             </div>

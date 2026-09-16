@@ -14,10 +14,10 @@ export async function GET(request: NextRequest) {
       const name = data.user.user_metadata?.full_name || data.user.user_metadata?.name || email?.split("@")[0] || "Trader";
 
       if (email) {
-        // Ensure user exists in users table with 7-day trial by default
+        // Ensure user exists in users table with 3-day trial by default
         const userId = `USR-${Buffer.from(email).toString("hex").substring(0, 10).toUpperCase()}`;
         const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 7);
+        trialEnd.setDate(trialEnd.getDate() + 3);
 
         await supabaseAdmin.from("users").upsert(
           {

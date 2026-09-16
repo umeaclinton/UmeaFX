@@ -48,9 +48,9 @@ export function upsertUser(user: Partial<UserAccount> & { email: string; name: s
     saveUsers(users);
     return updated;
   } else {
-    // New User - default to 7-Day IB Free Trial
+    // New User - default to 3-Day IB Free Trial
     const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 7);
+    trialEnd.setDate(trialEnd.getDate() + 3);
 
     const newUser: UserAccount = {
       id: `USR-${Date.now().toString(36).toUpperCase()}`,
