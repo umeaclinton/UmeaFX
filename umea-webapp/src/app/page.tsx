@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import {
   ShieldCheck,
@@ -96,13 +97,19 @@ export default function HomePage() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => { setSelectedPlan("ib_free_trial"); setIsModalOpen(true); }}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/login"
+              className="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-gray-700 dark:text-slate-200 hover:text-emerald-500 dark:hover:text-emerald-400 transition"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/login"
               className="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-500 hover:bg-emerald-400 text-white transition-all duration-200 shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
             >
-              Connect MT5
-            </button>
+              Get Started
+            </Link>
           </div>
         </div>
       </header>

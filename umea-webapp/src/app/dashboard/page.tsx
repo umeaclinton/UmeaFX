@@ -46,14 +46,31 @@ export default function DashboardPage() {
     async function initUser() {
       const { data: { user } } = await supabasePublic.auth.getUser();
       let activeEmail = user?.email;
-      let activeName = user?.user_metadata?.full_name || user?.user_metadata?.name;
+      let activeName = user?.user_metadata?.first_name
+        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()
+        : user?.user_metadata?.full_name || user?.user_metadata?.name;
+
+      if (user) {
+        try {
+          const { data: profile } = await supabasePublic
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+
+          if (profile) {
+            activeName = `${profile.first_name} ${profile.last_name}`.trim();
+            if (profile.plan) setPlan(profile.plan as any);
+          }
+        } catch {}
+      }
 
       if (!activeEmail) {
         activeEmail = localStorage.getItem("umea_user_email") || "";
-        activeName = localStorage.getItem("umea_user_name") || "";
+        activeName = activeName || localStorage.getItem("umea_user_name") || "";
       }
 
-      if (!activeEmail) { router.push("/"); return; }
+      if (!activeEmail) { router.push("/login"); return; }
 
       setEmail(activeEmail);
       setName(activeName || activeEmail.split("@")[0] || "Trader");
