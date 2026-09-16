@@ -166,4 +166,25 @@ public:
          }
       }
    }
+
+   // Force close all positions opened by this EA (e.g., on 14-min hard timeout)
+   void ForceCloseAll(string reason = "14-min Hard Timeout")
+   {
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
+      {
+         if(m_pos.SelectByIndex(i))
+         {
+            if(m_pos.Symbol() == m_symbol && m_pos.Magic() == m_magic)
+            {
+               ulong ticket = m_pos.Ticket();
+               double profit = m_pos.Profit();
+               if(m_trade.PositionClose(ticket))
+               {
+                  PrintFormat(">> ⚠️ [FORCE CLOSE] Position #%I64u closed at market (Reason: %s | P/L: $%.2f)",
+                              ticket, reason, profit);
+               }
+            }
+         }
+      }
+   }
 };

@@ -5,23 +5,30 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, UmeaFX Project."
 #property link      "https://www.umeafx.com"
-#property version   "1.00"
-#property description "UMEA Range Break 100 Sniper | Spike Exhaustion Fade & Boundary Ping-Pong"
+#property version   "1.10"
+#property description "UMEA Range Break 100 Sniper | Cooled-Down New Bar Entry & Dual-Timer Boundary Retest"
 
 #include "SniperTrade.mqh"
 #include "SpikeDetector.mqh"
+
+enum ENUM_TRADE_TYPE
+{
+   TRADE_NONE = 0,
+   TRADE_INITIAL_FADE,
+   TRADE_RETEST
+};
 
 //+------------------------------------------------------------------+
 //| Inputs                                                           |
 //+------------------------------------------------------------------+
 input group "=== Sniper Spike Detection Settings ==="
-input double   InpSpikeThreshold       = 75.0;     // Spike Trigger Distance (Points from M1 Open)
-input double   InpExhaustionPts        = 2.0;      // Pullback Points to Confirm Peak Halt (1-3 pts)
+input double   InpSpikeThreshold       = 75.0;     // Minimum 1-Minute Candle Body to Qualify as Spike (Points)
 
-input group "=== Scalp Exit Settings ==="
+input group "=== Scalp Exit & Timer Settings ==="
 input double   InpTakeProfitPts        = 20.0;     // Sniper Take Profit (Points) [Default: 20 pts]
-input bool     InpEnableRetestTrades   = true;     // Enable Sniper Re-entry on Ceiling/Floor Retest
-input int      InpRetestWindowMins     = 14;       // Re-entry Countdown Window (Minutes from Spike)
+input bool     InpEnableRetestTrades   = true;     // Enable Trade #2 on Ceiling/Floor Retest
+input int      InpRetestWindowMins     = 9;        // Max Minutes After Spike Allowed to Enter Trade #2 (Default: 9 mins)
+input int      InpHardTimeoutMins      = 14;       // Hard Expiration to Force-Close Trade #2 (Default: 14 mins from spike)
 input double   InpRetestBufferPts      = 2.0;      // Touch Buffer from Ceiling/Floor (Points)
 
 input group "=== Trade Management & Risk ==="
@@ -42,11 +49,12 @@ input int      InpHUDYOffset           = 25;       // Panel Y Distance from Top
 //+------------------------------------------------------------------+
 //| Globals                                                          |
 //+------------------------------------------------------------------+
-CSniperTrade    ExtTrade;
-CSpikeDetector  ExtDetector;
+CSniperTrade     ExtTrade;
+CSpikeDetector   ExtDetector;
 
-int      ExtTotalSnipes = 0;
-datetime ExtLastTradeTime = 0;
+ENUM_TRADE_TYPE  ExtCurrentTradeType = TRADE_NONE;
+int              ExtTotalSnipes      = 0;
+datetime         ExtLastTradeTime    = 0;
 
 //+------------------------------------------------------------------+
 //| HUD Helpers                                                      |
@@ -108,12 +116,13 @@ void UpdateHUD()
 
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double spread = (ask - bid);
    double m1_open = iOpen(_Symbol, PERIOD_M1, 0);
 
    int px = InpHUDXOffset;
    int py = InpHUDYOffset;
-   int pw = 620;
-   int ph = 410;
+   int pw = 640;
+   int ph = 430;
 
    SetHUDPanel("BG", px, py, pw, ph, InpHUDPanelBg, InpHUDBorder);
 
@@ -121,53 +130,67 @@ void UpdateHUD()
    int x = px + 14;
    int line_h = 22;
 
-   string status_str = "MONITORING (Waiting for spike impulse)";
-   ENUM_SPIKE_STATE st = ExtDetector.GetState();
-   if(st == STATE_SPIKE_BUY_ACTIVE)
-      status_str = "⚡ BUY SPIKE IN PROGRESS (Tracking peak)...";
-   else if(st == STATE_SPIKE_SELL_ACTIVE)
-      status_str = "⚡ SELL SPIKE IN PROGRESS (Tracking bottom)...";
-   else if(ExtTrade.TotalActive() > 0)
-      status_str = "🎯 SNIPER IN TRADE (Hunting 20 pt Retracement)";
-
-   // Window countdown string
-   int window_sec = ExtDetector.GetRemainingWindowSeconds();
-   string window_str = "EXPIRED / INACTIVE (Waiting for next spike)";
-   if(window_sec > 0)
+   string status_str = "MONITORING (Waiting for M1 spike completion)";
+   int active_pos = ExtTrade.TotalActive();
+   if(active_pos > 0)
    {
-      int mm = window_sec / 60;
-      int ss = window_sec % 60;
+      if(ExtCurrentTradeType == TRADE_INITIAL_FADE)
+         status_str = "🎯 IN TRADE #1: Initial Spike Fade (Hunting 20 pt TP)";
+      else if(ExtCurrentTradeType == TRADE_RETEST)
+         status_str = "🎯 IN TRADE #2: Boundary Retest (Hunting 20 pt TP)";
+   }
+
+   // 9-minute window status
+   int retest_sec = ExtDetector.GetRemainingRetestSeconds();
+   string retest_str = "CLOSED / EXPIRED (Waiting for next spike)";
+   if(retest_sec > 0)
+   {
+      int mm = retest_sec / 60;
+      int ss = retest_sec % 60;
       if(!ExtDetector.IsRetestTaken())
+         retest_str = StringFormat("ARMED: %02d:%02d left to trigger Trade #2", mm, ss);
+      else
+         retest_str = StringFormat("TRADE #2 ALREADY TAKEN (Window: %02d:%02d left)", mm, ss);
+   }
+
+   // 14-minute timeout status
+   int timeout_sec = ExtDetector.GetRemainingTimeoutSeconds();
+   string timeout_str = "NONE";
+   if(ExtDetector.GetLastSpikeTime() > 0)
+   {
+      if(timeout_sec > 0)
       {
-         window_str = StringFormat("ACTIVE: %02d:%02d remaining (Ceiling/Floor Retest ARMED)", mm, ss);
+         int mm = timeout_sec / 60;
+         int ss = timeout_sec % 60;
+         timeout_str = StringFormat("%02d:%02d until 14m hard force-exit", mm, ss);
       }
       else
       {
-         window_str = StringFormat("RETEST ALREADY TAKEN (Window: %02d:%02d left)", mm, ss);
+         timeout_str = "EXPIRED (Past 14 minutes)";
       }
    }
 
-   SetHUDLabel("Title",    "UMEA Range Break 100 Sniper Engine v1.00", x, y, 10);
+   SetHUDLabel("Title",    "UMEA Range Break 100 Sniper Engine v1.10", x, y, 10);
    y += line_h;
-   SetHUDLabel("SubTitle", "Strategy: Spike Peak Exhaustion & 14m Boundary Retest (No-SL)", x, y, 8);
+   SetHUDLabel("SubTitle", "Strategy: Cooled-Down New Bar Entry & 9m/14m Retest Timers", x, y, 8);
    y += line_h + 2;
 
    SetHUDLabel("Div1", "--------------------------------------------------------------------------------", x, y, 8);
    y += line_h - 4;
 
-   SetHUDLabel("Status",     StringFormat("Status:           %s", status_str), x, y, 8);
+   SetHUDLabel("Status",       StringFormat("Status:           %s", status_str), x, y, 8);
    y += line_h;
-   SetHUDLabel("Window",     StringFormat("14m Window:       %s", window_str), x, y, 8);
+   SetHUDLabel("RetestTimer",  StringFormat("9m Retest Window: %s", retest_str), x, y, 8);
    y += line_h;
-   SetHUDLabel("MarketPrices", StringFormat("Current Bid:      %.1f   |  Ask: %.1f", bid, ask), x, y, 8);
+   SetHUDLabel("TimeoutTimer", StringFormat("14m Hard Cutoff:  %s", timeout_str), x, y, 8);
    y += line_h;
-   SetHUDLabel("M1Open",      StringFormat("Current M1 Open:  %.1f   |  M1 Move: %.1f pts", m1_open, MathAbs(bid - m1_open)), x, y, 8);
+   SetHUDLabel("MarketPrices", StringFormat("Bid: %.1f | Ask: %.1f | Live Spread: %.1f pts", bid, ask, spread), x, y, 8);
    y += line_h + 2;
 
    SetHUDLabel("Div2", "--------------------------------------------------------------------------------", x, y, 8);
    y += line_h - 4;
 
-   SetHUDLabel("LastSpike",   StringFormat("Last Spike:       %s (Size: %.1f pts)", ExtDetector.GetLastSpikeType(), ExtDetector.GetLastSpikeSize()), x, y, 8);
+   SetHUDLabel("LastSpike",   StringFormat("Last Spike:       %s (Body: %.1f pts)", ExtDetector.GetLastSpikeType(), ExtDetector.GetLastSpikeSize()), x, y, 8);
    y += line_h;
    SetHUDLabel("Boundaries",  StringFormat("Active Boundary:  Ceiling: %.1f  |  Floor: %.1f", ExtDetector.GetRangeCeiling(), ExtDetector.GetRangeFloor()), x, y, 8);
    y += line_h;
@@ -177,7 +200,7 @@ void UpdateHUD()
    SetHUDLabel("Div3", "--------------------------------------------------------------------------------", x, y, 8);
    y += line_h - 4;
 
-   SetHUDLabel("Stats",       StringFormat("Active Trades:    %d   |  Total Snipes Taken: %d", ExtTrade.TotalActive(), ExtTotalSnipes), x, y, 8);
+   SetHUDLabel("Stats",       StringFormat("Active Trades:    %d   |  Total Snipes Taken: %d", active_pos, ExtTotalSnipes), x, y, 8);
 
    ChartSetString(0, CHART_COMMENT, "");
    Comment("");
@@ -189,11 +212,16 @@ void UpdateHUD()
 int OnInit()
 {
    ExtTrade.Init(_Symbol, InpMagicNumber, InpUseFixedLot, InpFixedLot, InpRiskPercent);
-   ExtDetector.Init(_Symbol, InpSpikeThreshold, InpExhaustionPts, InpRetestWindowMins);
+   ExtDetector.Init(_Symbol, InpSpikeThreshold, InpRetestWindowMins, InpHardTimeoutMins);
 
-   Print("UMEA Range Break 100 Sniper Engine v1.00 initialized!");
-   Print("Spike Trigger: ", InpSpikeThreshold, " pts | Exhaustion: ", InpExhaustionPts, 
-         " pts | Scalp TP: ", InpTakeProfitPts, " pts | Retest Window: ", InpRetestWindowMins, " mins | No-SL Mode Active");
+   ExtCurrentTradeType = TRADE_NONE;
+   ExtTotalSnipes      = 0;
+   ExtLastTradeTime    = 0;
+
+   Print("UMEA Range Break 100 Sniper Engine v1.10 initialized!");
+   Print("Spike Trigger: ", InpSpikeThreshold, " pts | Entry: NEW M1 BAR OPEN (Cooled Down)");
+   Print("TP: +", InpTakeProfitPts, " pts | Retest Window: ", InpRetestWindowMins, 
+         " mins | Hard Cutoff: ", InpHardTimeoutMins, " mins from spike");
 
    return INIT_SUCCEEDED;
 }
@@ -213,64 +241,93 @@ void OnTick()
 
    UpdateHUD();
 
-   // 1. Tick-by-tick real-time quick close monitor (closes instantly the moment 20 pts reached)
+   // 1. Tick-by-tick real-time quick close monitor (closes the instant +20 pts TP reached)
    ExtTrade.CheckQuickClose(InpTakeProfitPts);
 
-   // 2. If already in a scalp trade, do not open another trade simultaneously
-   if(ExtTrade.TotalActive() > 0)
-      return;
-
-   // 3. Update real-time spike detector
-   int spike_signal = ExtDetector.UpdateTick(bid, ask);
-
-   // Signal 1: Buy Spike halted at peak -> FIRE INSTANT TRADE #1: SELL FADE!
-   if(spike_signal == 1)
+   int active_pos = ExtTrade.TotalActive();
+   if(active_pos == 0)
    {
-      if(ExtTrade.SellAtPeak(InpTakeProfitPts, "RB100-SniperSell"))
-      {
-         ExtTotalSnipes++;
-         ExtLastTradeTime = TimeCurrent();
-         Print(">> 🚀 [SNIPER SHOT #1] SELL executed at spike peak! Target TP: +", InpTakeProfitPts, " pts retracement.");
-      }
-      return;
-   }
-   // Signal -1: Sell Spike halted at bottom -> FIRE INSTANT TRADE #1: BUY FADE!
-   else if(spike_signal == -1)
-   {
-      if(ExtTrade.BuyAtBottom(InpTakeProfitPts, "RB100-SniperBuy"))
-      {
-         ExtTotalSnipes++;
-         ExtLastTradeTime = TimeCurrent();
-         Print(">> 🚀 [SNIPER SHOT #1] BUY executed at spike bottom! Target TP: +", InpTakeProfitPts, " pts bounce.");
-      }
-      return;
+      ExtCurrentTradeType = TRADE_NONE;
    }
 
-   // 4. Secondary Re-test Trade (Trade #2): ONLY within the 14-minute window from the spike!
-   if(InpEnableRetestTrades && ExtDetector.IsWindowActive() && (TimeCurrent() - ExtLastTradeTime > 15))
+   // 2. HARD TIMEOUT ENFORCEMENT: Force-close Trade #2 if 14 minutes have elapsed from the spike!
+   if(active_pos > 0 && ExtCurrentTradeType == TRADE_RETEST)
+   {
+      if(ExtDetector.IsHardTimeoutReached())
+      {
+         Print(">> 🛑 [14-MIN HARD TIMEOUT REACHED] Closing Trade #2 at market price!");
+         ExtTrade.ForceCloseAll("14-min Hard Timeout reached from Spike");
+         ExtCurrentTradeType = TRADE_NONE;
+         return;
+      }
+   }
+
+   // 3. Update tick-level pullback tracking (arms Trade #2 once price retreats from boundary)
+   ExtDetector.UpdateTickPullback(bid, ask);
+
+   // 4. CHECK FOR COMPLETED SPIKE ON NEW 1-MINUTE BAR OPEN (Cooled-down execution)
+   // Only triggers on the very first tick of a brand new 1-minute candle!
+   int new_bar_signal = ExtDetector.CheckNewBarSpike();
+
+   if(new_bar_signal != 0 && active_pos == 0)
+   {
+      // Buy Spike just finished printing -> Launch Trade #1: SELL on the calm open of the new bar!
+      if(new_bar_signal == 1)
+      {
+         if(ExtTrade.SellAtPeak(InpTakeProfitPts, "RB100-NewBarFadeSell"))
+         {
+            ExtTotalSnipes++;
+            ExtCurrentTradeType = TRADE_INITIAL_FADE;
+            ExtLastTradeTime = TimeCurrent();
+            PrintFormat(">> 🚀 [TRADE #1 EXECUTED] SELL on New Bar Open at Bid: %.1f! Spread cooled down. Target TP: +%.1f pts.",
+                        bid, InpTakeProfitPts);
+         }
+         return;
+      }
+      // Sell Spike just finished printing -> Launch Trade #1: BUY on the calm open of the new bar!
+      else if(new_bar_signal == -1)
+      {
+         if(ExtTrade.BuyAtBottom(InpTakeProfitPts, "RB100-NewBarFadeBuy"))
+         {
+            ExtTotalSnipes++;
+            ExtCurrentTradeType = TRADE_INITIAL_FADE;
+            ExtLastTradeTime = TimeCurrent();
+            PrintFormat(">> 🚀 [TRADE #1 EXECUTED] BUY on New Bar Open at Ask: %.1f! Spread cooled down. Target TP: +%.1f pts.",
+                        ask, InpTakeProfitPts);
+         }
+         return;
+      }
+   }
+
+   // 5. SECONDARY RE-TEST TRADE (TRADE #2): ONLY within 9 minutes of the spike!
+   // Must be enabled, no trade active (Trade #1 must be completed and closed), and within 9 minutes
+   if(InpEnableRetestTrades && active_pos == 0 && ExtDetector.IsRetestWindowActive() && (TimeCurrent() - ExtLastTradeTime > 15))
    {
       int retest_signal = ExtDetector.CheckBoundaryRetest(bid, ask, InpRetestBufferPts);
-      
-      // Buy Spike Case: Market touches back the upper ceiling within 14 mins -> FIRE TRADE #2: SELL RETEST!
+
+      // Buy Spike Case: Market touches back the upper ceiling within 9 mins -> Launch Trade #2: SELL RETEST!
       if(retest_signal == 1)
       {
          if(ExtTrade.SellAtPeak(InpTakeProfitPts, "RB100-RetestSell"))
          {
             ExtTotalSnipes++;
+            ExtCurrentTradeType = TRADE_RETEST;
             ExtLastTradeTime = TimeCurrent();
-            Print(">> 🎯 [SNIPER SHOT #2] Price touched UPPER CEILING within 14m window -> FADE SELL executed! TP: +", InpTakeProfitPts, " pts.");
+            PrintFormat(">> 🎯 [TRADE #2 EXECUTED] Price retested UPPER CEILING within 9m window! SELL executed at Bid: %.1f (TP: +%.1f pts, Hard Exit at 14m).",
+                        bid, InpTakeProfitPts);
          }
       }
-      // Sell Spike Case: Market touches back the lower floor within 14 mins -> FIRE TRADE #2: BUY RETEST!
+      // Sell Spike Case: Market touches back the lower floor within 9 mins -> Launch Trade #2: BUY RETEST!
       else if(retest_signal == -1)
       {
          if(ExtTrade.BuyAtBottom(InpTakeProfitPts, "RB100-RetestBuy"))
          {
             ExtTotalSnipes++;
+            ExtCurrentTradeType = TRADE_RETEST;
             ExtLastTradeTime = TimeCurrent();
-            Print(">> 🎯 [SNIPER SHOT #2] Price touched LOWER FLOOR within 14m window -> FADE BUY executed! TP: +", InpTakeProfitPts, " pts.");
+            PrintFormat(">> 🎯 [TRADE #2 EXECUTED] Price retested LOWER FLOOR within 9m window! BUY executed at Ask: %.1f (TP: +%.1f pts, Hard Exit at 14m).",
+                        ask, InpTakeProfitPts);
          }
       }
    }
 }
-
