@@ -268,13 +268,20 @@ export default function LoginPage() {
     <div className="min-h-screen bg-white dark:bg-[#000000] text-gray-900 dark:text-white flex flex-col justify-between selection:bg-emerald-500 selection:text-white transition-colors duration-200">
       {/* Top Header */}
       <header className="px-6 py-6 border-b border-gray-100 dark:border-white/8 flex items-center justify-between max-w-7xl mx-auto w-full">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-black text-base shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition">
-            U
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-[1px] shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition">
+            <div className="w-full h-full bg-black rounded-2xl overflow-hidden">
+              <Image src="/logo.png" alt="UmeaFX Logo" width={40} height={40} className="w-full h-full object-cover" priority />
+            </div>
           </div>
-          <span className="font-black text-lg tracking-tight">
-            Umea<span className="text-emerald-500">FX</span>
-          </span>
+          <div>
+            <span className="font-black text-lg tracking-tight text-gray-900 dark:text-white">
+              Umea<span className="text-emerald-500">FX</span>
+            </span>
+            <span className="block text-[10px] uppercase tracking-widest font-mono text-gray-400 dark:text-slate-400 font-semibold">
+              Autonomous Systems
+            </span>
+          </div>
         </Link>
         <Link
           href="/"
